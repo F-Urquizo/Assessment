@@ -1,0 +1,3 @@
+# No editar este archivo. (nosotros)
+# Es para el manejo de versiones en git en este caso.
+provider = "postgresql"
