@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-appuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: ${POSTGRES_DB:-appraisal}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-appuser} -d ${POSTGRES_DB:-appraisal}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Overrides the localhost DATABASE_URL from .env so NestJS reaches
+      # Postgres via the Docker network hostname, not localhost.
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-appuser}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-appraisal}?schema=public"
+      MODEL_SERVICE_URL: "http://model-service:5050"
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # NOTE: model-service requires model_artifacts.joblib at startup.
+  # That file is gitignored and must be generated locally first:
+  #   cd model-service && python train_model.py
+  # Until it exists, this service will restart and the backend proxy will
+  # return 503 for /analyze, /predict, /compare — but compose still starts.
+  model-service:
+    build:
+      context: ./model-service
+      dockerfile: Dockerfile
+    volumes:
+      # Bind-mount so generated artifacts (*.joblib) are visible inside the
+      # container without being copied into the image.
+      - ./model-service:/app
+    ports:
+      - "5050:5050"
+    restart: on-failure
+
+volumes:
+  pg_data:
