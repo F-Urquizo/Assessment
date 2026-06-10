@@ -1,3 +1,4 @@
+import { UnauthorizedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
@@ -14,11 +15,21 @@ const publicUser = {
 const authMock = {
   register: jest.fn(),
   login: jest.fn(),
+  refresh: jest.fn(),
+  logout: jest.fn(),
 };
 
 const configMock = {
   get: jest.fn().mockImplementation((_key: string, fallback: unknown) => fallback),
 };
+
+function makeRes() {
+  return { cookie: jest.fn(), clearCookie: jest.fn() };
+}
+
+function makeReq(cookieValue?: string) {
+  return { cookies: cookieValue !== undefined ? { refresh: cookieValue } : {} };
+}
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -35,6 +46,7 @@ describe('AuthController', () => {
     controller = module.get(AuthController);
     jest.clearAllMocks();
     configMock.get.mockImplementation((_key: string, fallback: unknown) => fallback);
+    authMock.logout.mockResolvedValue(undefined);
   });
 
   // ── register ──────────────────────────────────────────────────────────────
@@ -61,45 +73,37 @@ describe('AuthController', () => {
   // ── login ─────────────────────────────────────────────────────────────────
 
   describe('POST /auth/login', () => {
-    const mockRes = { cookie: jest.fn() };
-
-    beforeEach(() => jest.clearAllMocks());
-
     it('sets an httpOnly cookie named "refresh" with the raw token', async () => {
       authMock.login.mockResolvedValue({
         accessToken: 'jwt.token',
         rawRefresh: 'raw_token_hex',
         user: publicUser,
       });
+      const res = makeRes();
 
-      await controller.login(
-        { email: 'user@example.com', password: 'pass1234' },
-        mockRes as any,
-      );
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
 
-      expect(mockRes.cookie).toHaveBeenCalledWith(
+      expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
         'raw_token_hex',
         expect.objectContaining({ httpOnly: true }),
       );
     });
 
-    it('scopes the cookie to /auth/refresh', async () => {
+    it('scopes the cookie to /auth', async () => {
       authMock.login.mockResolvedValue({
         accessToken: 'jwt',
         rawRefresh: 'raw',
         user: publicUser,
       });
+      const res = makeRes();
 
-      await controller.login(
-        { email: 'user@example.com', password: 'pass1234' },
-        mockRes as any,
-      );
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
 
-      expect(mockRes.cookie).toHaveBeenCalledWith(
+      expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
         expect.any(String),
-        expect.objectContaining({ path: '/auth/refresh' }),
+        expect.objectContaining({ path: '/auth' }),
       );
     });
 
@@ -109,10 +113,11 @@ describe('AuthController', () => {
         rawRefresh: 'raw_token_hex',
         user: publicUser,
       });
+      const res = makeRes();
 
       const result = await controller.login(
         { email: 'user@example.com', password: 'pass1234' },
-        mockRes as any,
+        res as any,
       );
 
       expect(result).toEqual({ accessToken: 'jwt.token', user: publicUser });
@@ -130,17 +135,89 @@ describe('AuthController', () => {
         if (key === 'COOKIE_SECURE') return 'true';
         return fallback;
       });
+      const res = makeRes();
 
-      await controller.login(
-        { email: 'user@example.com', password: 'pass1234' },
-        mockRes as any,
-      );
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
 
-      expect(mockRes.cookie).toHaveBeenCalledWith(
+      expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
         expect.any(String),
         expect.objectContaining({ sameSite: 'none', secure: true }),
       );
+    });
+  });
+
+  // ── refresh ───────────────────────────────────────────────────────────────
+
+  describe('POST /auth/refresh', () => {
+    it('reads the refresh cookie, calls service, sets new cookie and returns { accessToken }', async () => {
+      authMock.refresh.mockResolvedValue({
+        accessToken: 'new.jwt',
+        rawRefresh: 'new_raw',
+      });
+      const res = makeRes();
+
+      const result = await controller.refresh(makeReq('old_raw') as any, res as any);
+
+      expect(authMock.refresh).toHaveBeenCalledWith('old_raw');
+      expect(res.cookie).toHaveBeenCalledWith(
+        'refresh',
+        'new_raw',
+        expect.objectContaining({ httpOnly: true, path: '/auth' }),
+      );
+      expect(result).toEqual({ accessToken: 'new.jwt' });
+    });
+
+    it('response body does not include rawRefresh', async () => {
+      authMock.refresh.mockResolvedValue({ accessToken: 'new.jwt', rawRefresh: 'new_raw' });
+      const res = makeRes();
+
+      const result = await controller.refresh(makeReq('old_raw') as any, res as any);
+
+      expect(result).not.toHaveProperty('rawRefresh');
+    });
+
+    it('throws 401 when no refresh cookie is present', async () => {
+      const res = makeRes();
+
+      await expect(
+        controller.refresh(makeReq() as any, res as any),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(authMock.refresh).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── logout ────────────────────────────────────────────────────────────────
+
+  describe('POST /auth/logout', () => {
+    it('calls logout with cookie value and clears the cookie', async () => {
+      const res = makeRes();
+
+      await controller.logout(makeReq('raw_token') as any, res as any);
+
+      expect(authMock.logout).toHaveBeenCalledWith('raw_token');
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'refresh',
+        expect.objectContaining({ path: '/auth', httpOnly: true }),
+      );
+    });
+
+    it('clearCookie options do not contain maxAge (to avoid conflicting with browser expiry)', async () => {
+      const res = makeRes();
+
+      await controller.logout(makeReq('raw_token') as any, res as any);
+
+      const clearOpts = (res.clearCookie as jest.Mock).mock.calls[0][1];
+      expect(clearOpts).not.toHaveProperty('maxAge');
+    });
+
+    it('is idempotent: no cookie → still calls logout(undefined) and clears cookie', async () => {
+      const res = makeRes();
+
+      await controller.logout(makeReq() as any, res as any);
+
+      expect(authMock.logout).toHaveBeenCalledWith(undefined);
+      expect(res.clearCookie).toHaveBeenCalled();
     });
   });
 });

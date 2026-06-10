@@ -4,11 +4,13 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
-import type { CookieOptions, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import { Public } from './guards';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -44,6 +46,30 @@ export class AuthController {
     return { accessToken, user };
   }
 
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const raw = req.cookies?.['refresh'] as string | undefined;
+    if (!raw) throw new UnauthorizedException();
+    const { accessToken, rawRefresh } = await this.auth.refresh(raw);
+    res.cookie('refresh', rawRefresh, this.cookieOptions());
+    return { accessToken };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const raw = req.cookies?.['refresh'] as string | undefined;
+    await this.auth.logout(raw);
+    res.clearCookie('refresh', this.clearCookieOpts());
+  }
+
   private cookieOptions(): CookieOptions {
     const secure =
       this.config.get<string>('COOKIE_SECURE', 'false') === 'true';
@@ -55,8 +81,15 @@ export class AuthController {
       httpOnly: true,
       secure,
       sameSite,
-      path: '/auth/refresh',
+      // Path covers /auth/refresh, /auth/logout — both need the cookie.
+      path: '/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
+  }
+
+  // clearCookie must use the same path/sameSite/secure so the browser removes it.
+  private clearCookieOpts(): CookieOptions {
+    const { maxAge: _maxAge, ...opts } = this.cookieOptions();
+    return opts;
   }
 }
