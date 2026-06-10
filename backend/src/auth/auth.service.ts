@@ -17,6 +17,11 @@ export interface LoginResult {
   user: UserPublic;
 }
 
+export interface RefreshResult {
+  accessToken: string;
+  rawRefresh: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -64,5 +69,53 @@ export class AuthService {
     });
 
     return { accessToken, rawRefresh, user: this.users.toPublic(user) };
+  }
+
+  async refresh(rawToken: string): Promise<RefreshResult> {
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+
+    const stored = await this.prisma.refreshToken.findFirst({ where: { tokenHash } });
+
+    if (!stored) throw new UnauthorizedException('invalid refresh token');
+    if (stored.expiresAt < new Date()) throw new UnauthorizedException('invalid refresh token');
+
+    if (stored.revokedAt) {
+      // Reuse-attack: a token from this family was already consumed — kill the whole chain.
+      await this.prisma.refreshToken.updateMany({
+        where: { familyId: stored.familyId },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('invalid refresh token');
+    }
+
+    const newRaw = randomBytes(32).toString('hex');
+    const newHash = createHash('sha256').update(newRaw).digest('hex');
+    const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.refreshToken.update({
+        where: { id: stored.id },
+        data: { revokedAt: new Date() },
+      });
+      await tx.refreshToken.create({
+        data: { userId: stored.userId, tokenHash: newHash, familyId: stored.familyId, expiresAt },
+      });
+    });
+
+    // Reload user so the new JWT reflects any role change since the last login.
+    const user = await this.users.findById(stored.userId);
+    if (!user) throw new UnauthorizedException();
+
+    const accessToken = this.jwt.sign({ sub: user.id, role: user.role });
+    return { accessToken, rawRefresh: newRaw };
+  }
+
+  async logout(rawToken: string | undefined): Promise<void> {
+    if (!rawToken) return;
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    await this.prisma.refreshToken.updateMany({
+      where: { tokenHash, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 }

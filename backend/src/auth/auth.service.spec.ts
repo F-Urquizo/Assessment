@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { Prisma, Role } from '@prisma/client';
 import { hash as argon2hash, verify as argon2verify } from 'argon2';
+import { createHash } from 'node:crypto';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
@@ -37,6 +38,7 @@ const publicUser = {
 
 const usersMock = {
   findByEmail: jest.fn(),
+  findById: jest.fn(),
   create: jest.fn(),
   toPublic: jest.fn().mockReturnValue(publicUser),
 };
@@ -46,7 +48,13 @@ const jwtMock = {
 };
 
 const prismaMock = {
-  refreshToken: { create: jest.fn().mockResolvedValue({}) },
+  refreshToken: {
+    create: jest.fn().mockResolvedValue({}),
+    findFirst: jest.fn(),
+    update: jest.fn().mockResolvedValue({}),
+    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+  },
+  $transaction: jest.fn(),
 };
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
@@ -72,7 +80,12 @@ describe('AuthService', () => {
     (argon2verify as jest.Mock).mockResolvedValue(true);
     jwtMock.sign.mockReturnValue('signed.jwt.token');
     prismaMock.refreshToken.create.mockResolvedValue({});
+    prismaMock.refreshToken.update.mockResolvedValue({});
+    prismaMock.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+    // $transaction calls the callback with prismaMock as the transaction client.
+    prismaMock.$transaction.mockImplementation((fn: any) => fn(prismaMock));
     usersMock.toPublic.mockReturnValue(publicUser);
+    usersMock.findById.mockResolvedValue(baseUser);
   });
 
   // ── register ──────────────────────────────────────────────────────────────
@@ -195,6 +208,136 @@ describe('AuthService', () => {
       const result = await service.login({ email: 'user@example.com', password: 'password123' });
 
       expect(result.user).not.toHaveProperty('passwordHash');
+    });
+  });
+
+  // ── refresh ───────────────────────────────────────────────────────────────
+
+  describe('refresh', () => {
+    const RAW = 'a'.repeat(64);
+    const TOKEN_HASH = createHash('sha256').update(RAW).digest('hex');
+    const FAMILY_ID = 'family-uuid-001';
+
+    const validStored = {
+      id: 'token-cuid',
+      userId: baseUser.id,
+      tokenHash: TOKEN_HASH,
+      familyId: FAMILY_ID,
+      expiresAt: new Date(Date.now() + 100_000),
+      revokedAt: null,
+      createdAt: new Date(),
+    };
+
+    it('revokes old token and creates a new one in the same family', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue(validStored);
+
+      await service.refresh(RAW);
+
+      expect(prismaMock.refreshToken.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: validStored.id },
+          data: expect.objectContaining({ revokedAt: expect.any(Date) }),
+        }),
+      );
+      expect(prismaMock.refreshToken.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: baseUser.id,
+            familyId: FAMILY_ID,
+            tokenHash: expect.any(String),
+            expiresAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('returns a new accessToken and a fresh rawRefresh different from the original', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue(validStored);
+
+      const result = await service.refresh(RAW);
+
+      expect(result.accessToken).toBe('signed.jwt.token');
+      expect(result.rawRefresh).toBeDefined();
+      expect(result.rawRefresh).not.toBe(RAW);
+    });
+
+    it('stores a 64-char SHA-256 hash for the new token — not the raw value', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue(validStored);
+
+      const result = await service.refresh(RAW);
+
+      const newHash: string =
+        (prismaMock.refreshToken.create as jest.Mock).mock.calls[0][0].data.tokenHash;
+      expect(newHash).toHaveLength(64);
+      expect(newHash).not.toBe(result.rawRefresh);
+    });
+
+    it('reuse attack: revokes entire family and throws 401', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue({
+        ...validStored,
+        revokedAt: new Date(),
+      });
+
+      await expect(service.refresh(RAW)).rejects.toThrow(UnauthorizedException);
+
+      expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { familyId: FAMILY_ID },
+        data: expect.objectContaining({ revokedAt: expect.any(Date) }),
+      });
+    });
+
+    it('throws 401 when the token is expired', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue({
+        ...validStored,
+        expiresAt: new Date(Date.now() - 1_000),
+      });
+
+      await expect(service.refresh(RAW)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('throws 401 when the token is not found', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue(null);
+
+      await expect(service.refresh(RAW)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('reloads user by userId for the new JWT (reflects current role)', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue(validStored);
+
+      await service.refresh(RAW);
+
+      expect(usersMock.findById).toHaveBeenCalledWith(baseUser.id);
+      expect(jwtMock.sign).toHaveBeenCalledWith({
+        sub: baseUser.id,
+        role: baseUser.role,
+      });
+    });
+  });
+
+  // ── logout ────────────────────────────────────────────────────────────────
+
+  describe('logout', () => {
+    const RAW = 'b'.repeat(64);
+    const TOKEN_HASH = createHash('sha256').update(RAW).digest('hex');
+
+    it('revokes the token by hash when a valid raw token is provided', async () => {
+      await service.logout(RAW);
+
+      expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { tokenHash: TOKEN_HASH, revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+
+    it('resolves without error when no token is provided (undefined)', async () => {
+      await expect(service.logout(undefined)).resolves.toBeUndefined();
+      expect(prismaMock.refreshToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('resolves without error when the token is not in the database', async () => {
+      prismaMock.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.logout(RAW)).resolves.toBeUndefined();
     });
   });
 });
