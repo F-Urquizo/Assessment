@@ -13,6 +13,7 @@ import { JwtStrategy } from './jwt.strategy';
     PassportModule,
     MailModule,
     UsersModule,
+    PassportModule,
     JwtModule.registerAsync({
       // ConfigModule is global — no need to list it in imports here.
       useFactory: (config: ConfigService) => ({

@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { ListingsModule } from './listings/listings.module';
 import { JwtAuthGuard, RolesGuard, VerifiedGuard } from './auth/guards';
 import { ModelController } from './model/model.controller';
 import { ModelService } from './model/model.service';
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     AuthModule,
     AdminModule,
+    ListingsModule,
   ],
   controllers: [ModelController],
   providers: [
