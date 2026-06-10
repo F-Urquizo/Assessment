@@ -311,3 +311,15 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--ink); 
 
 .mkt-pager { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 36px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: rgba(32,37,31,.6); }
 .mkt-pager .linkbtn:disabled { opacity: .3; cursor: not-allowed; text-decoration: none; }
+
+/* "Recommended for you" rail (A2) */
+.recs-rail-wrap { margin-top: 30px; }
+.recs-rail-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.recs-rail-title { font-family: var(--serif); font-weight: 400; font-size: 26px; line-height: 1; }
+.recs-rail-sub { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgba(32,37,31,.55); }
+.recs-rail { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; scroll-snap-type: x proximity; }
+.rec-card { flex: 0 0 252px; scroll-snap-align: start; background: var(--paper-card); border: 1px solid var(--rule); border-left: 4px solid var(--amber); padding: 18px; display: flex; flex-direction: column; gap: 10px; min-height: 150px; animation: fadeUp .5s ease both; }
+.rec-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.rec-card-title { font-family: var(--serif); font-weight: 400; font-size: 19px; line-height: 1.1; letter-spacing: -.01em; }
+.rec-card-price { font-family: var(--serif); font-size: 27px; color: var(--green); line-height: 1; }
+.rec-card-why { font-size: 10.5px; line-height: 1.55; color: rgba(32,37,31,.65); margin-top: auto; }
