@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { ListingsModule } from './listings/listings.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { FavoritesModule } from './favorites/favorites.module';
 import { JwtAuthGuard, RolesGuard, VerifiedGuard } from './auth/guards';
 import { ModelController } from './model/model.controller';
 import { ModelService } from './model/model.service';
@@ -27,6 +28,7 @@ import { UsersModule } from './users/users.module';
     AdminModule,
     ListingsModule,
     RecommendationsModule,
+    FavoritesModule,
   ],
   controllers: [ModelController],
   providers: [
