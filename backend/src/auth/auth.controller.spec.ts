@@ -17,6 +17,7 @@ const authMock = {
   login: jest.fn(),
   refresh: jest.fn(),
   logout: jest.fn(),
+  verifyEmail: jest.fn(),
 };
 
 const configMock = {
@@ -218,6 +219,29 @@ describe('AuthController', () => {
 
       expect(authMock.logout).toHaveBeenCalledWith(undefined);
       expect(res.clearCookie).toHaveBeenCalled();
+    });
+  });
+
+  // ── verify-email ──────────────────────────────────────────────────────────
+
+  describe('GET /auth/verify-email', () => {
+    it('calls verifyEmail with the token query param and returns { verified: true }', async () => {
+      authMock.verifyEmail.mockResolvedValue(undefined);
+
+      const result = await controller.verifyEmail('some-raw-token');
+
+      expect(authMock.verifyEmail).toHaveBeenCalledWith('some-raw-token');
+      expect(result).toEqual({ verified: true });
+    });
+
+    it('passes empty string to service when token query param is absent', async () => {
+      authMock.verifyEmail.mockResolvedValue(undefined);
+
+      // The service throws BadRequestException for empty tokens; controller
+      // just forwards whatever @Query('token') provides.
+      await controller.verifyEmail(undefined as any);
+
+      expect(authMock.verifyEmail).toHaveBeenCalledWith(undefined);
     });
   });
 });

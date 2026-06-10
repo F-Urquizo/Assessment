@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -44,6 +46,15 @@ export class AuthController {
     const { accessToken, rawRefresh, user } = await this.auth.login(dto);
     res.cookie('refresh', rawRefresh, this.cookieOptions());
     return { accessToken, user };
+  }
+
+  // GET /auth/verify-email?token=<rawToken>
+  // 200 on success; 400 invalid; 410 expired/used.
+  // Redirect to the landing page is handled client-side by Ramiro's frontend.
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string) {
+    await this.auth.verifyEmail(token);
+    return { verified: true };
   }
 
   @Post('refresh')
