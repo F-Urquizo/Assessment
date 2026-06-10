@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { CryptoModule } from './crypto/crypto.module';
 import { ListingsModule } from './listings/listings.module';
 import { JwtAuthGuard, RolesGuard, VerifiedGuard } from './auth/guards';
 import { ModelController } from './model/model.controller';
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
     PrismaModule,
     AuditModule,
+    CryptoModule,
     UsersModule,
     AuthModule,
     AdminModule,

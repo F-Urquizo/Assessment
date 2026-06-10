@@ -1,98 +1,114 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Vehicle Appraisal — NestJS Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+REST API for the vehicle appraisal platform. Handles authentication, session management, and proxies prediction requests to the Python model service.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Quick Start
 
 ```bash
-$ npm install
+# 1. Install dependencies
+npm install
+
+# 2. Copy env template — defaults to plain HTTP on :3000, no cert needed
+cp ../.env.example .env
+
+# 3. Apply Prisma migrations (requires Postgres running)
+npx prisma migrate dev
+
+# 4. Start in watch mode
+npm run start:dev
 ```
 
-## Compile and run the project
+The server starts at **http://localhost:3000** (default, no TLS).  
+See § TLS below to opt in to HTTPS locally.
+
+---
+
+## TLS / HTTPS in Development
+
+The backend defaults to **plain HTTP on :3000** so the whole team can run `npm run start:dev` without a cert. HTTPS is an opt-in via `TLS_MODE` in `backend/.env`.
+
+| `TLS_MODE` | What runs | HSTS emitted? | Use when |
+|---|---|---|---|
+| *(unset, default)* | Plain HTTP :3000, no HSTS | No | Daily dev, Docker, CI |
+| `direct` | NestJS creates HTTPS server | Yes | Local HTTPS demo, small VPS as edge |
+| `proxy` | NestJS runs HTTP behind ingress | Yes | Cloud LB / nginx / Caddy terminates TLS |
+
+### Generating the self-signed certificate
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+mkdir -p backend/certs
+openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
+  -keyout backend/certs/server.key -out backend/certs/server.crt \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 ```
 
-## Run tests
+**The `certs/` directory is in `.gitignore` — never commit key material.**
+
+When Chrome shows the "Your connection is not private" warning for a self-signed cert, click **Advanced → Proceed to localhost**. Alternatively, use [mkcert](https://github.com/FiloSottile/mkcert) to generate a locally-trusted cert:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+brew install mkcert
+mkcert -install
+mkcert -key-file backend/certs/server.key -cert-file backend/certs/server.crt localhost 127.0.0.1
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Generating the encryption key
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Copy the output into `ENCRYPTION_KEY` in `.env`. It must be exactly 64 hex characters.
 
-## Resources
+---
 
-Check out a few resources that may come in handy when working with NestJS:
+## Environment Variables
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | Prisma connection string. Add `?sslmode=require` in production. |
+| `JWT_ACCESS_SECRET` | Yes | ≥32-char secret for signing access tokens |
+| `JWT_REFRESH_SECRET` | Yes | ≥32-char secret for refresh token HMAC |
+| `JWT_ACCESS_EXPIRES_IN` | No | Access token TTL (default `15m`) |
+| `COOKIE_SAME_SITE` | No | `lax` / `none` (default `lax`) |
+| `COOKIE_SECURE` | No | `true` / `false` (default `false`) |
+| `TLS_MODE` | No | `direct` / `proxy` / unset |
+| `TLS_KEY_PATH` | When direct | Path to TLS private key (default `certs/server.key`) |
+| `TLS_CERT_PATH` | When direct | Path to TLS certificate (default `certs/server.crt`) |
+| `PORT` | No | HTTPS/HTTP port (default `3443` direct, `3000` proxy/off) |
+| `HTTP_REDIRECT_PORT` | No | HTTP→HTTPS redirect port (default `3080`, direct only) |
+| `ENCRYPTION_KEY` | Yes | 64-char hex AES-256 key |
+| `CORS_ORIGIN` | No | Allowed CORS origin (default `true` = any) |
+| `FRONTEND_URL` | Yes | Base URL for email verification links |
+| `MODEL_SERVICE_URL` | Yes | Flask model service URL |
+| `SMTP_HOST` | No | SMTP hostname; if unset, links are logged to console |
+| `SMTP_PORT` | No | SMTP port (default `587`) |
+| `SMTP_USER` | No | SMTP username |
+| `SMTP_PASS` | No | SMTP password |
+| `SMTP_FROM` | No | From address for outgoing email |
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Running Tests
 
-## Stay in touch
+```bash
+npm run test          # unit tests
+npm run test:cov      # coverage report
+npm run test:e2e      # end-to-end (requires running Postgres)
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
+## Database
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Migrations are managed by Prisma. To apply all pending migrations:
+
+```bash
+npx prisma migrate deploy    # production (no shadow DB)
+npx prisma migrate dev       # development (creates shadow DB, runs seed)
+```
+
+See `docs/db-design.md` for the full schema and design rationale.
