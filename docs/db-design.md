@@ -103,4 +103,42 @@ User 1 ──< EmailVerificationToken
 
 ---
 
-*This document will be extended as new tables are added (saved appraisals, audit log, etc.).*
+---
+
+### `AuditLog` (table: `auth_audit_log`)
+
+Append-only event store for authentication and authorization events. Designed for forensic analysis and compliance, not application state.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `TEXT` (cuid) | PK |
+| `userId` | `TEXT?` | Nullable FK → `User.id` `ON DELETE SET NULL` |
+| `event` | `AuditEvent` enum | One of 8 event types (see enum) |
+| `ip` | `TEXT?` | Client IP extracted by the controller layer |
+| `userAgent` | `TEXT?` | `User-Agent` header value |
+| `metadata` | `JSONB?` | Per-event context (e.g. attempted email on login_failure, familyId on reuse) |
+| `createdAt` | `TIMESTAMP` | Immutable insert-time |
+
+**Why `ON DELETE SET NULL` (not Cascade)?** Audit rows must survive user deletion — they are part of the security record. A deleted user's login history and anomaly events should remain readable for compliance and forensic investigation. `SET NULL` preserves the row while removing the FK reference; a row with `userId = null` simply indicates the associated account no longer exists.
+
+**Why nullable `userId`?** Some events have no associated user — specifically `login_failure` for an email that doesn't exist in the database. Forcing a `NOT NULL` constraint would prevent logging these events, which are among the most security-relevant (brute-force probing).
+
+**Why `metadata: JSONB`?** Different events carry structurally different context (`email` for `login_failure`, `familyId` for `refresh_reuse_detected`, `newRole` for `role_changed`). A single JSONB column per row avoids a sparse multi-column design or a separate polymorphic key-value table. All scalar columns (`event`, `ip`, `userAgent`, `createdAt`) remain 3NF — metadata is contextual payload, not a derived or repeated fact.
+
+**Append-only pattern**: rows are never updated or deleted by the application. `revokedAt`-style mutations don't exist here — an audit log that can be rewritten isn't an audit log.
+
+**Indexes:** `userId` (filter/paginate by user), `event` (filter by event type), `createdAt` (newest-first pagination, the default read pattern).
+
+---
+
+## Entity Relationship
+
+```
+User 1 ──< RefreshToken
+User 1 ──< EmailVerificationToken
+User 1 ──< AuditLog   (userId nullable; row survives user deletion)
+```
+
+---
+
+*This document will be extended as new tables are added (saved appraisals, etc.).*

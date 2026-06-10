@@ -1,12 +1,13 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
+import { Role } from '@prisma/client';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UsersService } from '../users/users.service';
 
 interface JwtPayload {
   sub: string;
-  role: string;
+  role: Role;
   iat?: number;
   exp?: number;
 }
@@ -14,7 +15,8 @@ interface JwtPayload {
 /** Shape stored in req.user after JWT verification. */
 export interface RequestUser {
   id: string;
-  role: string;
+  email: string;
+  role: Role;
   emailVerified: boolean;
 }
 
@@ -35,6 +37,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.users.findById(payload.sub);
     // User deleted after token was issued → reject.
     if (!user) throw new UnauthorizedException();
-    return { id: user.id, role: user.role, emailVerified: user.emailVerified };
+    return { id: user.id, email: user.email, role: user.role, emailVerified: user.emailVerified };
   }
 }

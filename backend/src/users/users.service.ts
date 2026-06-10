@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Role, User } from '@prisma/client';
+import { AuditCtx, AuditEvent, AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -15,7 +16,10 @@ export type UserPublic = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   private normalize(email: string): string {
     return email.trim().toLowerCase();
@@ -47,10 +51,16 @@ export class UsersService {
     });
   }
 
-  async setRole(userId: string, role: Role): Promise<void> {
+  async setRole(userId: string, role: Role, ctx?: AuditCtx): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: { role },
+    });
+    await this.audit.log({
+      event: AuditEvent.role_changed,
+      userId,
+      metadata: { newRole: role },
+      ...ctx,
     });
   }
 
