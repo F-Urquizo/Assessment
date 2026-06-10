@@ -47,6 +47,9 @@ export default function ListingCard({
                 : badge.label
             }
           >
+            <span className="badge-sym" aria-hidden="true">
+              {badge.symbol}
+            </span>
             {badge.label}
             {delta !== null && (
               <b>

@@ -9,6 +9,7 @@ import { fetchListing } from '../../lib/api';
 import { mockListingDetail } from '../../lib/marketplace-mock';
 import { evaluateDeal } from '../../lib/deal';
 import { fmt, fmtN } from '../../lib/format';
+import { useFavorites } from '../../context/FavoritesContext';
 
 type DetailState =
   | { status: 'loading' }
@@ -66,7 +67,8 @@ export default function ListingDetail({
 }
 
 function DetailBody({ listing }: { listing: ListingDetailData }) {
-  const [favorited, setFavorited] = useState(false);
+  const { isFavorite, toggle } = useFavorites();
+  const favorited = isFavorite(listing.id);
   const title =
     `${listing.year} ${listing.manufacturer} ${listing.model}`.toUpperCase();
 
@@ -76,13 +78,14 @@ function DetailBody({ listing }: { listing: ListingDetailData }) {
         <div className="view-kicker">Listing · detail</div>
         <div className="detail-title-row">
           <div className="view-title">{title}</div>
-          {/* MOCK: A5/Fran favourites — local only; wire to /favorites later. */}
           <button
             className={'fav-btn' + (favorited ? ' on' : '')}
             aria-pressed={favorited}
-            onClick={() => setFavorited((f) => !f)}
+            aria-label={favorited ? 'Remove from favourites' : 'Save to favourites'}
+            onClick={() => toggle(listing)}
           >
-            {favorited ? '♥ Saved' : '♡ Save'}
+            <span aria-hidden="true">{favorited ? '♥' : '♡'}</span>{' '}
+            {favorited ? 'Saved' : 'Save'}
           </button>
         </div>
         <div className="subject-strip">
@@ -139,6 +142,9 @@ function ValuationAnalysis({ listing }: { listing: ListingDetailData }) {
           <div className="vsub">{sub}</div>
           {badge && (
             <span className={`deal-badge ${badge.cls}`} style={{ marginTop: 12 }}>
+              <span className="badge-sym" aria-hidden="true">
+                {badge.symbol}
+              </span>
               {badge.label}
             </span>
           )}

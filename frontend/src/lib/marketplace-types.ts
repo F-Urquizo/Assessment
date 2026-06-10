@@ -73,10 +73,15 @@ export interface BrowseResult {
 /** Presentation metadata for the deal badge. Text label + class — never
  *  color alone (accessibility rubric #6). The threshold logic itself lives in
  *  the backend; the client only maps the already-computed badge to a label. */
-export const DEAL_BADGE_META: Record<DealBadge, { label: string; cls: string }> = {
-  under: { label: 'Under priced', cls: 'badge-under' },
-  fair: { label: 'Fair price', cls: 'badge-fair' },
-  over: { label: 'Over priced', cls: 'badge-over' },
+export const DEAL_BADGE_META: Record<
+  DealBadge,
+  { label: string; cls: string; symbol: string }
+> = {
+  // symbol is a redundant non-colour cue (helps colour-blind users distinguish
+  // badges at a glance); it's rendered aria-hidden since the label already says it.
+  under: { label: 'Under priced', cls: 'badge-under', symbol: '▾' },
+  fair: { label: 'Fair price', cls: 'badge-fair', symbol: '≈' },
+  over: { label: 'Over priced', cls: 'badge-over', symbol: '▴' },
 };
 
 /** Why a price-history row was written (mirrors backend PriceChangeReason). */

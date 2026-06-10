@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: Object.fromEntries(
-      ['/analyze', '/compare', '/predict', '/api', '/options', '/health', '/listings', '/recommendations'].map(
+      ['/analyze', '/compare', '/predict', '/api', '/options', '/health', '/listings', '/recommendations', '/favorites'].map(
         (p) => [p, { target: API_TARGET, changeOrigin: true }],
       ),
     ),
