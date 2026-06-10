@@ -89,7 +89,14 @@ function RecommendationCard({
     >
       <div className="rec-card-head">
         <h3 className="rec-card-title">{title}</h3>
-        {badge && <span className={`deal-badge ${badge.cls}`}>{badge.label}</span>}
+        {badge && (
+          <span className={`deal-badge ${badge.cls}`}>
+            <span className="badge-sym" aria-hidden="true">
+              {badge.symbol}
+            </span>
+            {badge.label}
+          </span>
+        )}
       </div>
       <div className="rec-card-price">{fmt(listing.askingPrice)}</div>
       <div className="rec-card-why">{why}</div>

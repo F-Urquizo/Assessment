@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
 import Studio from './components/Studio';
 import Marketplace from './components/Marketplace';
+import Favorites from './components/Favorites';
+import { AuthProvider } from './context/auth-provider';
+import { FavoritesProvider } from './context/FavoritesProvider';
 import { fetchOptions } from './lib/api';
 import { MOCK_OPTIONS } from './lib/marketplace-mock';
 import type { Options } from './types';
 
-type Mode = 'studio' | 'marketplace';
+type Mode = 'marketplace' | 'favorites' | 'studio';
+
+const TABS: ReadonlyArray<{ id: Mode; label: string }> = [
+  { id: 'marketplace', label: 'Marketplace' },
+  { id: 'favorites', label: 'Favorites' },
+  { id: 'studio', label: 'Studio' },
+];
 
 export default function App() {
   const [options, setOptions] = useState<Options | null>(null);
@@ -24,31 +33,28 @@ export default function App() {
     return <div style={{ padding: 48, fontFamily: 'monospace' }}>Loading…</div>;
 
   return (
-    <>
-      {/* TEMP nav — Ramiro owns the real nav/routing integration (auth shell). */}
-      <div className="mode-nav" role="tablist" aria-label="App section">
-        <button
-          role="tab"
-          aria-selected={mode === 'marketplace'}
-          className={'mode-tab' + (mode === 'marketplace' ? ' active' : '')}
-          onClick={() => setMode('marketplace')}
-        >
-          Marketplace
-        </button>
-        <button
-          role="tab"
-          aria-selected={mode === 'studio'}
-          className={'mode-tab' + (mode === 'studio' ? ' active' : '')}
-          onClick={() => setMode('studio')}
-        >
-          Studio
-        </button>
-      </div>
-      {mode === 'marketplace' ? (
-        <Marketplace options={options} />
-      ) : (
-        <Studio options={options} />
-      )}
-    </>
+    // Auth + favourites wrap the whole app. AuthProvider is the mock today; it
+    // swaps to Ramiro's real provider via context/auth-provider.ts (one line).
+    <AuthProvider>
+      <FavoritesProvider>
+        {/* TEMP nav — Ramiro owns the real nav/routing integration (auth shell). */}
+        <div className="mode-nav" role="tablist" aria-label="App section">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={mode === t.id}
+              className={'mode-tab' + (mode === t.id ? ' active' : '')}
+              onClick={() => setMode(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {mode === 'marketplace' && <Marketplace options={options} />}
+        {mode === 'favorites' && <Favorites />}
+        {mode === 'studio' && <Studio options={options} />}
+      </FavoritesProvider>
+    </AuthProvider>
   );
 }

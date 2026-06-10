@@ -65,11 +65,15 @@ async function main() {
     userIdByEmail[email] = user.id;
   }
 
-  // Idempotent reseed: drop prior demo listings (cascades their price history).
+  // Idempotent reseed: drop prior demo favourites + listings (cascades history).
+  await prisma.favorite.deleteMany({
+    where: { userId: { in: Object.values(userIdByEmail) } },
+  });
   await prisma.listing.deleteMany({
     where: { userId: { in: Object.values(userIdByEmail) } },
   });
 
+  const created: { id: string; userId: string }[] = [];
   for (const l of LISTINGS) {
     const listing = await prisma.listing.create({
       data: {
@@ -113,10 +117,20 @@ async function main() {
         newPredictedHigh: listing.predictedHigh,
       },
     });
+    created.push({ id: listing.id, userId: listing.userId });
+  }
+
+  // Each demo user favourites two listings owned by someone else, so the
+  // Favorites view + hearts have real data out of the box.
+  for (const userId of Object.values(userIdByEmail)) {
+    const others = created.filter((c) => c.userId !== userId).slice(0, 2);
+    for (const c of others) {
+      await prisma.favorite.create({ data: { userId, listingId: c.id } });
+    }
   }
 
   console.log(
-    `Seeded ${USERS.length} users and ${LISTINGS.length} listings.\n` +
+    `Seeded ${USERS.length} users, ${LISTINGS.length} listings and demo favourites.\n` +
       `Demo login → ${USERS.join(', ')}  (password: ${DEMO_PASSWORD})`,
   );
 }

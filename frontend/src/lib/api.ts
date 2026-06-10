@@ -2,9 +2,11 @@ import type { Analysis, CompareResult, Options, Payload } from '../types';
 import type {
   BrowseQuery,
   BrowseResult,
+  Listing,
   ListingDetail,
 } from './marketplace-types';
 import type { RecommendedListing } from './recommendations-types';
+import { authRequest } from './auth-request';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
@@ -60,4 +62,33 @@ export function fetchRecommendations(limit = 8): Promise<RecommendedListing[]> {
 /** GET /listings/:id — full listing detail incl. price history (public). */
 export function fetchListing(id: string): Promise<ListingDetail> {
   return request<ListingDetail>(`/listings/${encodeURIComponent(id)}`);
+}
+
+// ── Favourites (require auth — token from useAuth via the auth-request seam) ──
+
+/** GET /favorites — the current user's saved listings. */
+export function fetchFavorites(token: string | null): Promise<Listing[]> {
+  return authRequest<Listing[]>('/favorites', token);
+}
+
+/** POST /favorites — favourite a listing. */
+export function addFavorite(
+  listingId: string,
+  token: string | null,
+): Promise<{ favorited: true }> {
+  return authRequest('/favorites', token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ listingId }),
+  });
+}
+
+/** DELETE /favorites/:id — un-favourite a listing. */
+export function removeFavorite(
+  listingId: string,
+  token: string | null,
+): Promise<void> {
+  return authRequest<void>(`/favorites/${encodeURIComponent(listingId)}`, token, {
+    method: 'DELETE',
+  });
 }
