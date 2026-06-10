@@ -4,6 +4,7 @@ import Marketplace from './components/Marketplace';
 import Favorites from './components/Favorites';
 import { AuthProvider } from './context/auth-provider';
 import { FavoritesProvider } from './context/FavoritesProvider';
+import { MyListingsProvider } from './context/MyListingsProvider';
 import { fetchOptions } from './lib/api';
 import { MOCK_OPTIONS } from './lib/marketplace-mock';
 import type { Options } from './types';
@@ -37,6 +38,7 @@ export default function App() {
     // swaps to Ramiro's real provider via context/auth-provider.ts (one line).
     <AuthProvider>
       <FavoritesProvider>
+        <MyListingsProvider options={options}>
         {/* TEMP nav — Ramiro owns the real nav/routing integration (auth shell). */}
         <div className="mode-nav" role="tablist" aria-label="App section">
           {TABS.map((t) => (
@@ -54,6 +56,7 @@ export default function App() {
         {mode === 'marketplace' && <Marketplace options={options} />}
         {mode === 'favorites' && <Favorites />}
         {mode === 'studio' && <Studio options={options} />}
+        </MyListingsProvider>
       </FavoritesProvider>
     </AuthProvider>
   );

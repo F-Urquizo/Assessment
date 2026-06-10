@@ -7,6 +7,7 @@ interface GarageCardProps {
   onToggle: () => void;
   onRemove: () => void;
   onReopen: () => void;
+  onListCar: () => void;
 }
 
 export default function GarageCard({
@@ -15,6 +16,7 @@ export default function GarageCard({
   onToggle,
   onRemove,
   onReopen,
+  onListCar,
 }: GarageCardProps) {
   return (
     <div className={'gcard' + (selected ? ' sel' : '')}>
@@ -32,6 +34,7 @@ export default function GarageCard({
       </div>
       <div className="gcard-foot">
         <button onClick={onReopen}>↻ reopen report</button>
+        <button onClick={onListCar}>List this car →</button>
       </div>
     </div>
   );

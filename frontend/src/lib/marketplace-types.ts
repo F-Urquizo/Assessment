@@ -106,3 +106,26 @@ export interface PriceHistoryEntry {
 export interface ListingDetail extends Listing {
   priceHistory: PriceHistoryEntry[];
 }
+
+/** Body for POST/PATCH /listings (mirrors the backend CreateListingDto). The
+ *  derived valuation fields are never sent — the service computes them. */
+export interface ListingInput {
+  manufacturer: string;
+  model: string;
+  year: number;
+  odometer: number;
+  cylinders?: number | null;
+  condition: string;
+  fuel: string;
+  titleStatus: string;
+  transmission: string;
+  drive: string;
+  type: string;
+  paintColor: string;
+  state: string;
+  askingPrice: number;
+  description?: string | null;
+  contactEmail: string;
+  contactPhone?: string | null;
+  status?: ListingStatus;
+}

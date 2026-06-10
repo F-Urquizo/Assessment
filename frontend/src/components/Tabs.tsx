@@ -15,6 +15,7 @@ const TABS: TabDef[] = [
   { id: 'deal', num: '04', label: 'Deal check', lockable: true },
   { id: 'market', num: '05', label: 'Market', lockable: true },
   { id: 'garage', num: '06', label: 'Garage', lockable: false },
+  { id: 'sell', num: '07', label: 'Sell', lockable: false },
 ];
 
 export default function Tabs() {
