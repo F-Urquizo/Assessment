@@ -8,12 +8,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser, JwtAuthGuard, Public } from '../auth/guards';
 import type { RequestUser } from '../auth/guards';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
+import { BrowseListingsDto } from './dto/browse-listings.dto';
 import { ListingsService } from './listings.service';
 
 /**
@@ -34,8 +36,8 @@ export class ListingsController {
 
   @Public()
   @Get()
-  findAll() {
-    return this.listings.findActive();
+  findAll(@Query() query: BrowseListingsDto) {
+    return this.listings.browse(query);
   }
 
   @Public()

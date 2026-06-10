@@ -88,10 +88,26 @@ const prismaMock = {
     create: jest.fn(),
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    count: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   },
+  listingPriceHistory: {
+    create: jest.fn(),
+    findMany: jest.fn(),
+  },
+  // Interactive-transaction stub: runs the callback with `prismaMock` itself as
+  // the transactional client, so a write through `tx.x` lands on the same spy
+  // the assertions inspect.
+  $transaction: jest.fn(),
 };
+
+/** The data persisted by the first call to the price-history create spy. */
+function historyData(): Record<string, number | string | null> {
+  return (
+    prismaMock.listingPriceHistory.create.mock.calls[0] as [PersistArgs]
+  )[0].data;
+}
 
 const modelMock = {
   post: jest.fn(),
@@ -120,6 +136,12 @@ describe('ListingsService', () => {
     );
     prismaMock.listing.update.mockImplementation((args: PersistArgs) =>
       Promise.resolve(makeListing(args.data)),
+    );
+    // Supports both transaction forms: the interactive callback used by
+    // create/update, and the array form `[findMany, count]` used by browse.
+    prismaMock.$transaction.mockImplementation(
+      (arg: unknown[] | ((tx: typeof prismaMock) => unknown)) =>
+        Array.isArray(arg) ? Promise.all(arg) : arg(prismaMock),
     );
   });
 
@@ -208,6 +230,35 @@ describe('ListingsService', () => {
       expect(data.dealDeltaPct).toBeNull();
       expect(view.dealBadge).toBeNull();
     });
+
+    it('writes a `created` price-history row with null old values', async () => {
+      await service.create(verifiedUser, createDto);
+
+      expect(prismaMock.listingPriceHistory.create).toHaveBeenCalledTimes(1);
+      const data = historyData();
+      expect(data).toEqual(
+        expect.objectContaining({
+          listingId: 'listing_1',
+          reason: 'created',
+          oldAskingPrice: null,
+          newAskingPrice: 18000,
+          oldPredictedValue: null,
+          newPredictedValue: 20000,
+          oldPredictedLow: null,
+          newPredictedLow: 18000,
+          oldPredictedHigh: null,
+          newPredictedHigh: 22000,
+        }),
+      );
+    });
+
+    it('writes the listing and its history row in one transaction', async () => {
+      await service.create(verifiedUser, createDto);
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(prismaMock.listing.create).toHaveBeenCalled();
+      expect(prismaMock.listingPriceHistory.create).toHaveBeenCalled();
+    });
   });
 
   // ── update ──────────────────────────────────────────────────────────────────
@@ -266,6 +317,92 @@ describe('ListingsService', () => {
         }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('writes an `asking_price_change` history row when only price moves', async () => {
+      await service.update(verifiedUser, 'listing_1', { askingPrice: 16000 });
+
+      expect(prismaMock.listingPriceHistory.create).toHaveBeenCalledTimes(1);
+      expect(historyData()).toEqual(
+        expect.objectContaining({
+          listingId: 'listing_1',
+          reason: 'asking_price_change',
+          oldAskingPrice: 18000,
+          newAskingPrice: 16000,
+          oldPredictedValue: 20000,
+          newPredictedValue: 20000,
+          oldPredictedLow: 18000,
+          newPredictedLow: 18000,
+          oldPredictedHigh: 22000,
+          newPredictedHigh: 22000,
+        }),
+      );
+    });
+
+    it('writes a `revaluation` history row when a spec field changes', async () => {
+      modelMock.post.mockResolvedValue({
+        price: 15000,
+        low: 13000,
+        high: 17000,
+      });
+
+      await service.update(verifiedUser, 'listing_1', { odometer: 90000 });
+
+      expect(prismaMock.listingPriceHistory.create).toHaveBeenCalledTimes(1);
+      expect(historyData()).toEqual(
+        expect.objectContaining({
+          reason: 'revaluation',
+          oldPredictedValue: 20000,
+          newPredictedValue: 15000,
+          oldPredictedLow: 18000,
+          newPredictedLow: 13000,
+          oldPredictedHigh: 22000,
+          newPredictedHigh: 17000,
+          oldAskingPrice: 18000,
+          newAskingPrice: 18000,
+        }),
+      );
+    });
+
+    it('writes a `revaluation` history row when only valuation bounds change', async () => {
+      modelMock.post.mockResolvedValue({
+        price: 20000,
+        low: 17000,
+        high: 23000,
+      });
+
+      await service.update(verifiedUser, 'listing_1', { odometer: 90000 });
+
+      expect(prismaMock.listingPriceHistory.create).toHaveBeenCalledTimes(1);
+      expect(historyData()).toEqual(
+        expect.objectContaining({
+          reason: 'revaluation',
+          oldPredictedValue: 20000,
+          newPredictedValue: 20000,
+          oldPredictedLow: 18000,
+          newPredictedLow: 17000,
+          oldPredictedHigh: 22000,
+          newPredictedHigh: 23000,
+          oldAskingPrice: 18000,
+          newAskingPrice: 18000,
+        }),
+      );
+    });
+
+    it('writes NO history row when neither price nor valuation changes', async () => {
+      await service.update(verifiedUser, 'listing_1', {
+        description: 'updated copy',
+      });
+
+      expect(prismaMock.listingPriceHistory.create).not.toHaveBeenCalled();
+    });
+
+    it('writes the listing update and history row in one transaction', async () => {
+      await service.update(verifiedUser, 'listing_1', { askingPrice: 16000 });
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(prismaMock.listing.update).toHaveBeenCalled();
+      expect(prismaMock.listingPriceHistory.create).toHaveBeenCalled();
+    });
   });
 
   // ── remove ──────────────────────────────────────────────────────────────────
@@ -313,6 +450,22 @@ describe('ListingsService', () => {
         NotFoundException,
       );
     });
+
+    it('includes the ordered price history in the detail view', async () => {
+      const history = [{ id: 'h1' }, { id: 'h2' }];
+      prismaMock.listing.findUnique.mockResolvedValue(
+        makeListing({ priceHistory: history }),
+      );
+
+      const view = await service.findOne('listing_1');
+
+      expect(prismaMock.listing.findUnique).toHaveBeenCalledWith({
+        where: { id: 'listing_1' },
+        include: { priceHistory: { orderBy: { changedAt: 'asc' } } },
+      });
+      expect(view.priceHistory).toBe(history);
+      expect(view.dealBadge).toBe('under');
+    });
   });
 
   // ── findActive (Fran's recommendation seam) ──────────────────────────────────
@@ -343,6 +496,123 @@ describe('ListingsService', () => {
       expect(prismaMock.listing.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { status: ListingStatus.active } }),
       );
+    });
+  });
+
+  // ── browse (marketplace filters / sort / pagination) ─────────────────────────
+
+  describe('browse', () => {
+    beforeEach(() => {
+      prismaMock.listing.findMany.mockResolvedValue([
+        makeListing({ status: ListingStatus.active }),
+      ]);
+      prismaMock.listing.count.mockResolvedValue(1);
+    });
+
+    /** The `where` of the first findMany call. */
+    function browseWhere(): Record<string, unknown> {
+      return (
+        prismaMock.listing.findMany.mock.calls[0] as [
+          { where: Record<string, unknown> },
+        ]
+      )[0].where;
+    }
+
+    it('always filters to active listings', async () => {
+      await service.browse({});
+      expect(browseWhere()).toEqual({ status: ListingStatus.active });
+    });
+
+    it('composes make, type, state and price-range filters', async () => {
+      await service.browse({
+        make: 'toyota',
+        type: 'sedan',
+        state: 'ca',
+        minPrice: 10000,
+        maxPrice: 25000,
+      });
+
+      expect(browseWhere()).toEqual({
+        status: ListingStatus.active,
+        manufacturer: 'toyota',
+        type: 'sedan',
+        state: 'ca',
+        askingPrice: { gte: 10000, lte: 25000 },
+      });
+    });
+
+    it('applies a one-sided price range', async () => {
+      await service.browse({ minPrice: 10000 });
+      expect(browseWhere()).toEqual({
+        status: ListingStatus.active,
+        askingPrice: { gte: 10000 },
+      });
+    });
+
+    it.each([
+      ['newest', { createdAt: 'desc' }],
+      ['priceAsc', { askingPrice: 'asc' }],
+      ['priceDesc', { askingPrice: 'desc' }],
+      ['bestDeal', { dealDeltaPct: { sort: 'asc', nulls: 'last' } }],
+    ])('maps sort=%s to the right orderBy', async (sort, orderBy) => {
+      await service.browse({ sort: sort as never });
+      expect(prismaMock.listing.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy }),
+      );
+    });
+
+    it('computes skip/take from page and pageSize', async () => {
+      await service.browse({ page: 3, pageSize: 10 });
+      expect(prismaMock.listing.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
+    });
+
+    it('returns items plus total/page/pageSize metadata', async () => {
+      prismaMock.listing.count.mockResolvedValue(42);
+      const result = await service.browse({ page: 2, pageSize: 5 });
+
+      expect(result.total).toBe(42);
+      expect(result.page).toBe(2);
+      expect(result.pageSize).toBe(5);
+      expect(result.items[0].dealBadge).toBe('under');
+      // total counts the filtered set, not just the returned page
+      expect(prismaMock.listing.count).toHaveBeenCalledWith({
+        where: { status: ListingStatus.active },
+      });
+    });
+
+    it('applies newest/page-1/pageSize-20 defaults on an empty query', async () => {
+      await service.browse({});
+      expect(prismaMock.listing.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'desc' },
+          skip: 0,
+          take: 20,
+        }),
+      );
+    });
+
+    it('runs findMany and count in a single transaction', async () => {
+      await service.browse({});
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── priceHistory (detail trend) ──────────────────────────────────────────────
+
+  describe('priceHistory', () => {
+    it('returns the rows ordered oldest → newest', async () => {
+      const rows = [{ id: 'h1' }, { id: 'h2' }];
+      prismaMock.listingPriceHistory.findMany.mockResolvedValue(rows);
+
+      const result = await service.priceHistory('listing_1');
+
+      expect(prismaMock.listingPriceHistory.findMany).toHaveBeenCalledWith({
+        where: { listingId: 'listing_1' },
+        orderBy: { changedAt: 'asc' },
+      });
+      expect(result).toBe(rows);
     });
   });
 });

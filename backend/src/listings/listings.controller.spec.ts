@@ -13,7 +13,12 @@ const user: RequestUser = {
 
 const serviceMock = {
   create: jest.fn().mockResolvedValue({ id: 'listing_1' }),
-  findActive: jest.fn().mockResolvedValue([{ id: 'listing_1' }]),
+  browse: jest.fn().mockResolvedValue({
+    items: [{ id: 'listing_1' }],
+    total: 1,
+    page: 1,
+    pageSize: 20,
+  }),
   findOne: jest.fn().mockResolvedValue({ id: 'listing_1' }),
   update: jest.fn().mockResolvedValue({ id: 'listing_1' }),
   remove: jest.fn().mockResolvedValue(undefined),
@@ -38,10 +43,16 @@ describe('ListingsController', () => {
     expect(serviceMock.create).toHaveBeenCalledWith(user, dto);
   });
 
-  it('findAll() returns active listings', async () => {
-    const result = await controller.findAll();
-    expect(serviceMock.findActive).toHaveBeenCalled();
-    expect(result).toEqual([{ id: 'listing_1' }]);
+  it('findAll() passes the browse query through to the service', async () => {
+    const query = { make: 'toyota', sort: 'bestDeal', page: 2 } as never;
+    const result = await controller.findAll(query);
+    expect(serviceMock.browse).toHaveBeenCalledWith(query);
+    expect(result).toEqual({
+      items: [{ id: 'listing_1' }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
   });
 
   it('findOne() looks up by id', async () => {

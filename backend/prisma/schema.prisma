@@ -20,6 +20,12 @@ enum ListingStatus {
   sold
 }
 
+enum PriceChangeReason {
+  created
+  asking_price_change
+  revaluation
+}
+
 // User
 
 model User {
@@ -84,9 +90,39 @@ model Listing {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  priceHistory ListingPriceHistory[]
+
   @@index([userId])
   @@index([status])
   @@index([manufacturer])
+}
+
+// ListingPriceHistory
+//
+// Append-only audit trail: one row every time a listing's askingPrice or its
+// valuation (predictedValue/Low/High) changes — including the initial create. Written
+// transactionally alongside the Listing so a price and its audit row never
+// drift apart.
+
+model ListingPriceHistory {
+  id        String  @id @default(cuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  oldAskingPrice    Int? // null on the initial `created` row
+  newAskingPrice    Int
+  oldPredictedValue Int?
+  newPredictedValue Int?
+  oldPredictedLow   Int?
+  newPredictedLow   Int?
+  oldPredictedHigh  Int?
+  newPredictedHigh  Int?
+
+  reason    PriceChangeReason
+  changedAt DateTime          @default(now())
+
+  @@index([listingId])
+  @@index([changedAt])
 }
 
 // RefreshToken
