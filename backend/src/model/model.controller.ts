@@ -1,6 +1,9 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Public } from '../auth/guards';
 import { ModelService } from './model.service';
 
+// Proxy routes are unauthenticated — the Studio uses them without logging in.
+@Public()
 @Controller()
 export class ModelController {
   constructor(private readonly model: ModelService) {}
