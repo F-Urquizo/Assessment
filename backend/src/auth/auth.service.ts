@@ -1,14 +1,24 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  GoneException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import { hash, verify, argon2id } from 'argon2';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService, UserPublic } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const VERIFY_EMAIL_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface LoginResult {
   accessToken: string;
@@ -28,13 +38,15 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ user: UserPublic }> {
     const passwordHash = await hash(dto.password, { type: argon2id });
+    let user;
     try {
-      const user = await this.users.create({ email: dto.email, passwordHash });
-      return { user: this.users.toPublic(user) };
+      user = await this.users.create({ email: dto.email, passwordHash });
     } catch (e) {
       if (
         e instanceof Prisma.PrismaClientKnownRequestError &&
@@ -44,6 +56,20 @@ export class AuthService {
       }
       throw e;
     }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + VERIFY_EMAIL_TTL_MS);
+
+    await this.prisma.emailVerificationToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+
+    const frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:5173');
+    const link = `${frontendUrl}/verify-email?token=${rawToken}`;
+    await this.mail.sendVerificationEmail(user.email, link);
+
+    return { user: this.users.toPublic(user) };
   }
 
   async login(dto: LoginDto): Promise<LoginResult> {
@@ -54,8 +80,7 @@ export class AuthService {
     const valid = await verify(user.passwordHash, dto.password);
     if (!valid) throw new UnauthorizedException('invalid credentials');
 
-    // TODO step 8: gate on emailVerified
-    // if (!user.emailVerified) throw new ForbiddenException('email not verified');
+    if (!user.emailVerified) throw new ForbiddenException('email not verified');
 
     const accessToken = this.jwt.sign({ sub: user.id, role: user.role });
 
@@ -69,6 +94,32 @@ export class AuthService {
     });
 
     return { accessToken, rawRefresh, user: this.users.toPublic(user) };
+  }
+
+  async verifyEmail(rawToken: string): Promise<void> {
+    if (!rawToken) throw new BadRequestException('invalid verification token');
+
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const stored = await this.prisma.emailVerificationToken.findFirst({
+      where: { tokenHash },
+    });
+
+    if (!stored) throw new BadRequestException('invalid verification token');
+    // Check usedAt before expiry so a deliberately used (and later expired) token
+    // reports "already used" rather than "expired".
+    if (stored.usedAt) throw new GoneException('token already used');
+    if (stored.expiresAt < new Date()) throw new GoneException('token expired');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.emailVerificationToken.update({
+        where: { id: stored.id },
+        data: { usedAt: new Date() },
+      });
+      await tx.user.update({
+        where: { id: stored.userId },
+        data: { emailVerified: true },
+      });
+    });
   }
 
   async refresh(rawToken: string): Promise<RefreshResult> {
