@@ -10,37 +10,30 @@ REST API for the vehicle appraisal platform. Handles authentication, session man
 # 1. Install dependencies
 npm install
 
-# 2. Copy env template and fill in secrets
+# 2. Copy env template — defaults to plain HTTP on :3000, no cert needed
 cp ../.env.example .env
 
-# 3. Generate a self-signed TLS cert for local HTTPS (see § TLS below)
-mkdir -p certs
-openssl req -x509 -newkey rsa:4096 -sha256 -days 365 -nodes \
-  -keyout certs/server.key -out certs/server.crt \
-  -subj "/CN=localhost" \
-  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
-
-# 4. Apply Prisma migrations (requires Postgres running)
+# 3. Apply Prisma migrations (requires Postgres running)
 npx prisma migrate dev
 
-# 5. Start in watch mode
+# 4. Start in watch mode
 npm run start:dev
 ```
 
-The server starts at **https://localhost:3443** (TLS_MODE=direct, default).  
-A plain HTTP server on :3080 issues 301 → https://localhost:3443.
+The server starts at **http://localhost:3000** (default, no TLS).  
+See § TLS below to opt in to HTTPS locally.
 
 ---
 
 ## TLS / HTTPS in Development
 
-The backend supports three modes, controlled by `TLS_MODE` in `.env`:
+The backend defaults to **plain HTTP on :3000** so the whole team can run `npm run start:dev` without a cert. HTTPS is an opt-in via `TLS_MODE` in `backend/.env`.
 
 | `TLS_MODE` | What runs | HSTS emitted? | Use when |
 |---|---|---|---|
-| `direct` | NestJS creates HTTPS server | Yes | Local dev, small VPS as the edge |
-| `proxy` | NestJS runs plain HTTP | Yes | Behind nginx / Caddy / cloud LB |
-| *(unset)* | Plain HTTP, no HSTS | No | CI, unit tests, legacy |
+| *(unset, default)* | Plain HTTP :3000, no HSTS | No | Daily dev, Docker, CI |
+| `direct` | NestJS creates HTTPS server | Yes | Local HTTPS demo, small VPS as edge |
+| `proxy` | NestJS runs HTTP behind ingress | Yes | Cloud LB / nginx / Caddy terminates TLS |
 
 ### Generating the self-signed certificate
 

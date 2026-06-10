@@ -27,14 +27,18 @@ async function bootstrap() {
     (app.getHttpAdapter().getInstance() as any).set('trust proxy', 1);
   }
 
-  app.use(
-    helmet({
-      // HSTS only when the browser connection is actually HTTPS (direct or via proxy).
-      hsts: isHttps
-        ? { maxAge: 31_536_000, includeSubDomains: true, preload: true }
-        : false,
-    }),
-  );
+  // HSTS is config-driven so the team can tune it per deployment.
+  // preload defaults OFF — it submits the domain to browser preload lists, which
+  // is irreversible for ≥1 year and risky on shared/staging domains.
+  const hsts = isHttps
+    ? {
+        maxAge: parseInt(process.env.HSTS_MAX_AGE ?? '31536000', 10),
+        includeSubDomains: (process.env.HSTS_INCLUDE_SUB_DOMAINS ?? 'true') === 'true',
+        preload: (process.env.HSTS_PRELOAD ?? 'false') === 'true',
+      }
+    : false;
+
+  app.use(helmet({ hsts }));
 
   app.use(cookieParser());
 
