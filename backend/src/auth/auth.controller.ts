@@ -4,14 +4,22 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { CookieOptions, Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
+import type { CookieOptions, Request, Response } from 'express';
+import { Public } from './guards';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
+// All /auth/* routes are public — they authenticate by credentials/cookie,
+// not by Bearer token. This covers current routes and future ones (refresh,
+// logout, verify-email) added in later steps.
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -25,9 +33,10 @@ export class AuthController {
     return this.auth.register(dto);
   }
 
-  // POST /auth/login → 200 (override NestJS @Post default of 201)
+  // POST /auth/login → 200; stricter throttle to resist brute-force.
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -35,6 +44,30 @@ export class AuthController {
     const { accessToken, rawRefresh, user } = await this.auth.login(dto);
     res.cookie('refresh', rawRefresh, this.cookieOptions());
     return { accessToken, user };
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const raw = req.cookies?.['refresh'] as string | undefined;
+    if (!raw) throw new UnauthorizedException();
+    const { accessToken, rawRefresh } = await this.auth.refresh(raw);
+    res.cookie('refresh', rawRefresh, this.cookieOptions());
+    return { accessToken };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const raw = req.cookies?.['refresh'] as string | undefined;
+    await this.auth.logout(raw);
+    res.clearCookie('refresh', this.clearCookieOpts());
   }
 
   private cookieOptions(): CookieOptions {
@@ -48,8 +81,15 @@ export class AuthController {
       httpOnly: true,
       secure,
       sameSite,
-      path: '/auth/refresh',
+      // Path covers /auth/refresh, /auth/logout — both need the cookie.
+      path: '/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
+  }
+
+  // clearCookie must use the same path/sameSite/secure so the browser removes it.
+  private clearCookieOpts(): CookieOptions {
+    const { maxAge: _maxAge, ...opts } = this.cookieOptions();
+    return opts;
   }
 }
