@@ -10,6 +10,7 @@ import {
   type Filters,
 } from '../../lib/marketplace-filters';
 import ListingCard from './ListingCard';
+import ListingDetail from './ListingDetail';
 import RecommendationsRail from './RecommendationsRail';
 
 const PAGE_SIZE = 12;
@@ -25,6 +26,7 @@ export default function MarketplaceView({ options }: { options: Options }) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [state, setState] = useState<BrowseState>({ status: 'loading' });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Changing a filter resets to page 1; everything else preserves the page.
   const patchFilters = (patch: Partial<Filters>) => {
@@ -62,6 +64,10 @@ export default function MarketplaceView({ options }: { options: Options }) {
 
   const total = state.status === 'done' ? state.result.total : null;
 
+  if (selectedId) {
+    return <ListingDetail id={selectedId} onBack={() => setSelectedId(null)} />;
+  }
+
   return (
     <>
       <div className="view-head">
@@ -81,11 +87,11 @@ export default function MarketplaceView({ options }: { options: Options }) {
         </div>
       )}
 
-      <RecommendationsRail />
+      <RecommendationsRail onOpen={setSelectedId} />
 
       <FilterBar options={options} filters={filters} onChange={patchFilters} />
 
-      <MarketplaceBody state={state} />
+      <MarketplaceBody state={state} onOpen={setSelectedId} />
 
       {state.status === 'done' && total !== null && total > PAGE_SIZE && (
         <Pager
@@ -99,7 +105,13 @@ export default function MarketplaceView({ options }: { options: Options }) {
   );
 }
 
-function MarketplaceBody({ state }: { state: BrowseState }) {
+function MarketplaceBody({
+  state,
+  onOpen,
+}: {
+  state: BrowseState;
+  onOpen: (id: string) => void;
+}) {
   if (state.status === 'loading') {
     return <div className="mkt-loading">Loading the lot…</div>;
   }
@@ -112,7 +124,7 @@ function MarketplaceBody({ state }: { state: BrowseState }) {
   return (
     <div className="listing-grid">
       {state.result.items.map((listing) => (
-        <ListingCard key={listing.id} listing={listing} />
+        <ListingCard key={listing.id} listing={listing} onOpen={onOpen} />
       ))}
     </div>
   );
