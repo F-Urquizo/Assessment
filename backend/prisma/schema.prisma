@@ -14,6 +14,12 @@ enum Role {
   admin
 }
 
+enum ListingStatus {
+  draft
+  active
+  sold
+}
+
 // User
 
 model User {
@@ -27,8 +33,60 @@ model User {
 
   refreshTokens          RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
+  listings               Listing[]
 
   @@index([email])
+}
+
+// Listing
+//
+// A marketplace vehicle listing. The first 13 columns (manufacturer..state)
+// are the exact spec fields the model-service /predict endpoint consumes —
+// keeping them 1-to-1 means valuation-on-write is a straight field map.
+// predicted* + dealDeltaPct are derived (written by the service on create and
+// on any spec/price change), never supplied by the client.
+
+model Listing {
+  id           String        @id @default(cuid())
+
+  // ── Spec fields (1:1 with model-service /predict input) ──
+  manufacturer String
+  model        String
+  year         Int
+  odometer     Int
+  cylinders    Int? // optional — model-service defaults to the dataset median
+  condition    String
+  fuel         String
+  titleStatus  String
+  transmission String
+  drive        String
+  type         String
+  paintColor   String
+  state        String
+
+  // ── Marketplace fields ──
+  askingPrice  Int
+  description  String?
+  contactEmail String
+  contactPhone String?
+  status       ListingStatus @default(draft)
+
+  // ── Derived valuation (written by the service, never the client) ──
+  predictedValue Int?
+  predictedLow   Int?
+  predictedHigh  Int?
+  // (asking - predicted) / predicted * 100. Negative = below market (good deal).
+  dealDeltaPct   Float?
+
+  // ── Ownership / audit ──
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([manufacturer])
 }
 
 // RefreshToken

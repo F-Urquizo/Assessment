@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
+import { ListingsModule } from './listings/listings.module';
 import { JwtAuthGuard, RolesGuard, VerifiedGuard } from './auth/guards';
 import { ModelController } from './model/model.controller';
 import { ModelService } from './model/model.service';
@@ -17,6 +18,7 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     UsersModule,
     AuthModule,
+    ListingsModule,
   ],
   controllers: [ModelController],
   providers: [
