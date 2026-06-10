@@ -29,7 +29,11 @@ function makeRes() {
 }
 
 function makeReq(cookieValue?: string) {
-  return { cookies: cookieValue !== undefined ? { refresh: cookieValue } : {} };
+  return {
+    cookies: cookieValue !== undefined ? { refresh: cookieValue } : {},
+    headers: {},
+    ip: '127.0.0.1',
+  };
 }
 
 describe('AuthController', () => {
@@ -74,6 +78,8 @@ describe('AuthController', () => {
   // ── login ─────────────────────────────────────────────────────────────────
 
   describe('POST /auth/login', () => {
+    const mockLoginReq = { ip: '127.0.0.1', headers: { 'user-agent': 'jest' } };
+
     it('sets an httpOnly cookie named "refresh" with the raw token', async () => {
       authMock.login.mockResolvedValue({
         accessToken: 'jwt.token',
@@ -82,7 +88,7 @@ describe('AuthController', () => {
       });
       const res = makeRes();
 
-      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, mockLoginReq as any, res as any);
 
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
@@ -99,7 +105,7 @@ describe('AuthController', () => {
       });
       const res = makeRes();
 
-      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, mockLoginReq as any, res as any);
 
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
@@ -118,6 +124,7 @@ describe('AuthController', () => {
 
       const result = await controller.login(
         { email: 'user@example.com', password: 'pass1234' },
+        mockLoginReq as any,
         res as any,
       );
 
@@ -138,7 +145,7 @@ describe('AuthController', () => {
       });
       const res = makeRes();
 
-      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, mockLoginReq as any, res as any);
 
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
@@ -160,7 +167,7 @@ describe('AuthController', () => {
 
       const result = await controller.refresh(makeReq('old_raw') as any, res as any);
 
-      expect(authMock.refresh).toHaveBeenCalledWith('old_raw');
+      expect(authMock.refresh).toHaveBeenCalledWith('old_raw', expect.objectContaining({ ip: '127.0.0.1' }));
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
         'new_raw',
@@ -196,7 +203,7 @@ describe('AuthController', () => {
 
       await controller.logout(makeReq('raw_token') as any, res as any);
 
-      expect(authMock.logout).toHaveBeenCalledWith('raw_token');
+      expect(authMock.logout).toHaveBeenCalledWith('raw_token', expect.objectContaining({ ip: '127.0.0.1' }));
       expect(res.clearCookie).toHaveBeenCalledWith(
         'refresh',
         expect.objectContaining({ path: '/auth', httpOnly: true }),
@@ -217,7 +224,7 @@ describe('AuthController', () => {
 
       await controller.logout(makeReq() as any, res as any);
 
-      expect(authMock.logout).toHaveBeenCalledWith(undefined);
+      expect(authMock.logout).toHaveBeenCalledWith(undefined, expect.any(Object));
       expect(res.clearCookie).toHaveBeenCalled();
     });
   });

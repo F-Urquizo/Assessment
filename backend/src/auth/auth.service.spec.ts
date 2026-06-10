@@ -15,9 +15,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { Prisma, Role } from '@prisma/client';
+import { AuditEvent, Prisma, Role } from '@prisma/client';
 import { hash as argon2hash, verify as argon2verify } from 'argon2';
 import { createHash } from 'node:crypto';
+import { AuditService } from '../audit/audit.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
@@ -79,6 +80,10 @@ const mailMock = {
   sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
 };
 
+const auditMock = {
+  log: jest.fn().mockResolvedValue(undefined),
+};
+
 const configMock = {
   get: jest.fn().mockImplementation((_key: string, fallback: unknown) => fallback),
 };
@@ -97,6 +102,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: MailService, useValue: mailMock },
         { provide: ConfigService, useValue: configMock },
+        { provide: AuditService, useValue: auditMock },
       ],
     }).compile();
 
@@ -118,6 +124,7 @@ describe('AuthService', () => {
     usersMock.toPublic.mockReturnValue(publicUser);
     usersMock.findById.mockResolvedValue(baseUser);
     mailMock.sendVerificationEmail.mockResolvedValue(undefined);
+    auditMock.log.mockResolvedValue(undefined);
     configMock.get.mockImplementation((_key: string, fallback: unknown) => fallback);
   });
 
@@ -281,6 +288,56 @@ describe('AuthService', () => {
       const result = await service.login({ email: 'user@example.com', password: 'password123' });
 
       expect(result.user).not.toHaveProperty('passwordHash');
+    });
+
+    it('logs login_success with userId and context on valid credentials', async () => {
+      usersMock.findByEmail.mockResolvedValue(baseUser);
+
+      await service.login(
+        { email: 'user@example.com', password: 'password123' },
+        { ip: '1.2.3.4', userAgent: 'jest' },
+      );
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.login_success,
+          userId: baseUser.id,
+          ip: '1.2.3.4',
+          userAgent: 'jest',
+        }),
+      );
+    });
+
+    it('logs login_failure with null userId and email in metadata when user not found', async () => {
+      usersMock.findByEmail.mockResolvedValue(null);
+
+      await expect(
+        service.login({ email: 'ghost@example.com', password: 'pass' }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.login_failure,
+          userId: null,
+          metadata: expect.objectContaining({ email: 'ghost@example.com' }),
+        }),
+      );
+    });
+
+    it('logs login_failure with userId when password is wrong', async () => {
+      usersMock.findByEmail.mockResolvedValue(baseUser);
+      (argon2verify as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.login({ email: 'user@example.com', password: 'bad' }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.login_failure,
+          userId: baseUser.id,
+        }),
+      );
     });
   });
 
@@ -449,6 +506,38 @@ describe('AuthService', () => {
         sub: baseUser.id,
         role: baseUser.role,
       });
+    });
+
+    it('logs token_rotated with userId and familyId after successful rotation', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue(validStored);
+
+      await service.refresh(RAW, { ip: '1.1.1.1' });
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.token_rotated,
+          userId: baseUser.id,
+          metadata: expect.objectContaining({ familyId: FAMILY_ID }),
+          ip: '1.1.1.1',
+        }),
+      );
+    });
+
+    it('logs refresh_reuse_detected with familyId before throwing 401', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue({
+        ...validStored,
+        revokedAt: new Date(),
+      });
+
+      await expect(service.refresh(RAW)).rejects.toThrow(UnauthorizedException);
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.refresh_reuse_detected,
+          userId: baseUser.id,
+          metadata: expect.objectContaining({ familyId: FAMILY_ID }),
+        }),
+      );
     });
   });
 

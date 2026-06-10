@@ -41,9 +41,11 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async login(
     @Body() dto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { accessToken, rawRefresh, user } = await this.auth.login(dto);
+    const ctx = { ip: (req as any).ip, userAgent: req.headers['user-agent'] as string | undefined };
+    const { accessToken, rawRefresh, user } = await this.auth.login(dto, ctx);
     res.cookie('refresh', rawRefresh, this.cookieOptions());
     return { accessToken, user };
   }
@@ -65,7 +67,8 @@ export class AuthController {
   ) {
     const raw = req.cookies?.['refresh'] as string | undefined;
     if (!raw) throw new UnauthorizedException();
-    const { accessToken, rawRefresh } = await this.auth.refresh(raw);
+    const ctx = { ip: (req as any).ip, userAgent: req.headers['user-agent'] as string | undefined };
+    const { accessToken, rawRefresh } = await this.auth.refresh(raw, ctx);
     res.cookie('refresh', rawRefresh, this.cookieOptions());
     return { accessToken };
   }
@@ -77,7 +80,8 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const raw = req.cookies?.['refresh'] as string | undefined;
-    await this.auth.logout(raw);
+    const ctx = { ip: (req as any).ip, userAgent: req.headers['user-agent'] as string | undefined };
+    await this.auth.logout(raw, ctx);
     res.clearCookie('refresh', this.clearCookieOpts());
   }
 
