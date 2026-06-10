@@ -139,4 +139,5 @@ export type TabName =
   | 'forecast'
   | 'deal'
   | 'market'
-  | 'garage';
+  | 'garage'
+  | 'sell';

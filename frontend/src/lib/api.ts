@@ -4,6 +4,7 @@ import type {
   BrowseResult,
   Listing,
   ListingDetail,
+  ListingInput,
 } from './marketplace-types';
 import type { RecommendedListing } from './recommendations-types';
 import { authRequest } from './auth-request';

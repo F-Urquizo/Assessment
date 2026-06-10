@@ -43,6 +43,13 @@ export class ListingsController {
     return this.listings.browse(query);
   }
 
+  // Authenticated — the caller's own listings, any status (incl. drafts). Must
+  // be declared before @Get(':id') so 'mine' isn't captured as an id.
+  @Get('mine')
+  findMine(@CurrentUser() user: RequestUser) {
+    return this.listings.mine(user.id);
+  }
+
   @Public()
   @Get(':id')
   findOne(@Param('id') id: string) {

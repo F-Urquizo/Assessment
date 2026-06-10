@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGarage } from '../../context/GarageContext';
 import { useStudio } from '../../context/StudioContext';
+import { useMyListings } from '../../context/MyListingsContext';
 import { compare } from '../../lib/api';
 import type { CompareResult } from '../../types';
 import GarageCard from './GarageCard';
@@ -17,7 +18,8 @@ type CompareState =
 export default function GarageView() {
   const { cards, selectedIds, selectedCards, isSelected, remove, clear, toggleSelect } =
     useGarage();
-  const { reopen } = useStudio();
+  const { reopen, setActiveTab } = useStudio();
+  const { startFromGarage } = useMyListings();
   const [compareState, setCompareState] = useState<CompareState>({ status: 'idle' });
 
   const resetCompare = () => setCompareState({ status: 'idle' });
@@ -107,6 +109,10 @@ export default function GarageView() {
               resetCompare();
             }}
             onReopen={() => reopen(card.payload)}
+            onListCar={() => {
+              startFromGarage(card);
+              setActiveTab('sell');
+            }}
           />
         ))}
       </div>

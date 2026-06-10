@@ -218,6 +218,15 @@ export class ListingsService {
     return { items: rows.map((l) => this.toView(l)), total, page, pageSize };
   }
 
+  /** Every listing owned by a user, any status — powers their "My Listings". */
+  async mine(userId: string): Promise<ListingView[]> {
+    const rows = await this.prisma.listing.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map((l) => this.toView(l));
+  }
+
   /** The append-only price/valuation trail for a listing, oldest → newest. */
   async priceHistory(listingId: string): Promise<ListingPriceHistory[]> {
     return this.prisma.listingPriceHistory.findMany({

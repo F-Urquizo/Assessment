@@ -13,6 +13,7 @@ import ForecastView from './views/ForecastView';
 import DealView from './views/DealView';
 import MarketView from './views/MarketView';
 import GarageView from './views/GarageView';
+import SellView from './views/SellView';
 
 function View({ tab, children }: { tab: TabName; children: ReactNode }) {
   const { activeTab } = useStudio();
@@ -43,6 +44,9 @@ function StudioShell() {
         </View>
         <View tab="garage">
           <GarageView />
+        </View>
+        <View tab="sell">
+          <SellView />
         </View>
         <Footer />
       </div>
