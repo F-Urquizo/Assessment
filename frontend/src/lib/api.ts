@@ -100,6 +100,45 @@ export function removeFavorite(
   });
 }
 
+// ── My listings / Sell (require auth) ──
+
+/** GET /listings/mine — the current user's listings, any status. */
+export function fetchMyListings(token: string | null): Promise<Listing[]> {
+  return authRequest<Listing[]>('/listings/mine', token);
+}
+
+/** POST /listings — create a listing. */
+export function createListing(
+  input: ListingInput,
+  token: string | null,
+): Promise<Listing> {
+  return authRequest<Listing>('/listings', token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+/** PATCH /listings/:id — update a listing. */
+export function updateListing(
+  id: string,
+  input: Partial<ListingInput>,
+  token: string | null,
+): Promise<Listing> {
+  return authRequest<Listing>(`/listings/${encodeURIComponent(id)}`, token, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+/** DELETE /listings/:id — delete a listing. */
+export function deleteListing(id: string, token: string | null): Promise<void> {
+  return authRequest<void>(`/listings/${encodeURIComponent(id)}`, token, {
+    method: 'DELETE',
+  });
+}
+
 // ── Auth (Ramiro) — see docs/API_CONTRACT.md ─────────────────────────────────
 //
 // These use their own helper instead of request<T>() because auth pages must

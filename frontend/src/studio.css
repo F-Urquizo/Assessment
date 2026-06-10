@@ -371,3 +371,17 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--ink); 
 .mylisting-status { flex: none; }
 .mylisting-status select { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--green); background: transparent; border: 1px solid var(--rule); padding: 5px 22px 5px 8px; -webkit-appearance: none; appearance: none; cursor: pointer; border-radius: 0; }
 .mylisting-del:hover { color: var(--red); }
+
+
+/* ── Auth pages (Ramiro) ─────────────────────────────────────────────────── */
+.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 48px 24px 90px 50px; }
+.auth-card { width: 100%; max-width: 440px; background: var(--paper-card); border: 1.5px solid var(--ink); box-shadow: 8px 8px 0 var(--green); padding: 38px 36px 30px; }
+.auth-title { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: 38px; line-height: 1; margin-bottom: 8px; }
+.auth-note { font-size: 11px; letter-spacing: .08em; color: rgba(32,37,31,.65); margin-bottom: 26px; }
+/* 4.5:1+ on --paper-card for WCAG AA */
+.auth-error { color: var(--red); font-size: 12px; line-height: 1.5; margin-top: 18px; padding: 10px 12px; border: 1px solid var(--red); background: rgba(163,51,31,.07); }
+.auth-error:focus { outline: 2px solid var(--amber); outline-offset: 2px; }
+.auth-success { color: var(--green); font-size: 12px; line-height: 1.5; margin-top: 18px; padding: 10px 12px; border: 1px solid var(--green); background: rgba(29,58,42,.07); }
+.auth-alt { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 11px; letter-spacing: .06em; }
+.auth-alt a { color: var(--amber); text-underline-offset: 3px; }
+.auth-alt a:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

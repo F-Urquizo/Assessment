@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from 'react-router-dom';
 import Studio from './components/Studio';
 import Marketplace from './components/Marketplace';
 import Favorites from './components/Favorites';
+import LoginPage from './pages/LoginPage';
 import { AuthProvider } from './context/auth-provider';
 import { FavoritesProvider } from './context/FavoritesProvider';
 import { MyListingsProvider } from './context/MyListingsProvider';
@@ -32,27 +33,30 @@ export default function App() {
     return <div style={{ padding: 48, fontFamily: 'monospace' }}>Loading…</div>;
 
   return (
-    // Auth + favourites wrap the whole app. AuthProvider is the mock today; it
-    // swaps to Ramiro's real provider via context/auth-provider.ts (one line).
+    // Auth wraps everything; favourites + my-listings are per-user features
+    // that consume it. AuthProvider swaps in context/auth-provider.ts.
     <AuthProvider>
       <FavoritesProvider>
         <MyListingsProvider options={options}>
-        {/* TEMP nav — Ramiro owns the real nav/routing integration (auth shell). */}
-        <div className="mode-nav" role="tablist" aria-label="App section">
-          {TABS.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.to === '/'}
-              className={({ isActive }) => 'mode-tab' + (isActive ? ' active' : '')}
-            >
-              {t.label}
-            </NavLink>
-          ))}
-        </div>
-        {mode === 'marketplace' && <Marketplace options={options} />}
-        {mode === 'favorites' && <Favorites />}
-        {mode === 'studio' && <Studio options={options} />}
+          <nav className="mode-nav" aria-label="App section">
+            {TABS.map((t) => (
+              <NavLink
+                key={t.to}
+                to={t.to}
+                end={t.to === '/'}
+                className={({ isActive }) => 'mode-tab' + (isActive ? ' active' : '')}
+              >
+                {t.label}
+              </NavLink>
+            ))}
+          </nav>
+          <Routes>
+            <Route path="/" element={<Marketplace options={options} />} />
+            <Route path="/favorites" element={<Favorites />} />
+            <Route path="/studio" element={<Studio options={options} />} />
+            <Route path="/login" element={<LoginPage />} />
+            {/* Auth routes (/register, /verify-email) land in later steps. */}
+          </Routes>
         </MyListingsProvider>
       </FavoritesProvider>
     </AuthProvider>
