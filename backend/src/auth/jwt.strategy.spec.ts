@@ -43,6 +43,7 @@ describe('JwtStrategy', () => {
 
       expect(result).toEqual({
         id: baseUser.id,
+        email: baseUser.email,
         role: baseUser.role,
         emailVerified: baseUser.emailVerified,
       });
