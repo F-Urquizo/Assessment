@@ -8,11 +8,13 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  // whitelist strips extra body fields not declared in DTOs.
-  // errorHttpStatusCode 422 matches the contract (class-validator errors → 422).
+  // whitelist + forbidNonWhitelisted reject unknown fields; transform coerces
+  // plain objects into DTO class instances. 422 matches the API contract.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
       errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
     }),
   );
