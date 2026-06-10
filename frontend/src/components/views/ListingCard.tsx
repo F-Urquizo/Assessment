@@ -5,14 +5,37 @@ import { fmt, fmtN } from '../../lib/format';
 /** One marketplace listing tile: vehicle, asking price, model valuation and the
  *  Under/Fair/Over deal badge. The badge carries a text label (not color alone)
  *  for accessibility (rubric #6). Detail + full visual analysis arrive in A3. */
-export default function ListingCard({ listing }: { listing: Listing }) {
+export default function ListingCard({
+  listing,
+  onOpen,
+}: {
+  listing: Listing;
+  onOpen?: (id: string) => void;
+}) {
   const title = `${listing.year} ${listing.manufacturer} ${listing.model}`.toUpperCase();
   const badge = listing.dealBadge ? DEAL_BADGE_META[listing.dealBadge] : null;
   const delta = listing.dealDeltaPct;
   const valued = listing.predictedValue !== null;
+  const open = onOpen ? () => onOpen(listing.id) : undefined;
 
   return (
-    <article className="listing-card">
+    <article
+      className="listing-card"
+      role={open ? 'button' : undefined}
+      tabIndex={open ? 0 : undefined}
+      aria-label={open ? `View ${title} details` : undefined}
+      onClick={open}
+      onKeyDown={
+        open
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="listing-card-head">
         <h3 className="listing-title">{title}</h3>
         {badge && (

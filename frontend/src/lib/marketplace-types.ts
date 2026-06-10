@@ -78,3 +78,26 @@ export const DEAL_BADGE_META: Record<DealBadge, { label: string; cls: string }> 
   fair: { label: 'Fair price', cls: 'badge-fair' },
   over: { label: 'Over priced', cls: 'badge-over' },
 };
+
+/** Why a price-history row was written (mirrors backend PriceChangeReason). */
+export type PriceChangeReason = 'created' | 'asking_price_change' | 'revaluation';
+
+/** One append-only price/valuation change (mirrors backend ListingPriceHistory). */
+export interface PriceHistoryEntry {
+  id: string;
+  reason: PriceChangeReason;
+  oldAskingPrice: number | null;
+  newAskingPrice: number;
+  oldPredictedValue: number | null;
+  newPredictedValue: number | null;
+  oldPredictedLow: number | null;
+  newPredictedLow: number | null;
+  oldPredictedHigh: number | null;
+  newPredictedHigh: number | null;
+  changedAt: string;
+}
+
+/** GET /listings/:id — a listing plus its price/valuation trail (oldest→newest). */
+export interface ListingDetail extends Listing {
+  priceHistory: PriceHistoryEntry[];
+}

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ListingCard from './ListingCard';
 import type { Listing } from '../../lib/marketplace-types';
 
@@ -50,6 +51,28 @@ describe('ListingCard', () => {
     render(<ListingCard listing={listing()} />);
     expect(screen.getByText('$21,000')).toBeInTheDocument();
     expect(screen.getByText(/\$19,000–\$23,000/)).toBeInTheDocument();
+  });
+
+  it('calls onOpen with the listing id on click', async () => {
+    const onOpen = vi.fn();
+    render(<ListingCard listing={listing()} onOpen={onOpen} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /view .* details/i }),
+    );
+    expect(onOpen).toHaveBeenCalledWith('l1');
+  });
+
+  it('opens on Enter for keyboard users', async () => {
+    const onOpen = vi.fn();
+    render(<ListingCard listing={listing()} onOpen={onOpen} />);
+    screen.getByRole('button', { name: /view .* details/i }).focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onOpen).toHaveBeenCalledWith('l1');
+  });
+
+  it('is not a button (not focusable) when no onOpen is given', () => {
+    render(<ListingCard listing={listing()} />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('shows "Not valued yet" and no badge when there is no valuation', () => {

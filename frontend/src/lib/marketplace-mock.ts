@@ -7,7 +7,9 @@ import type {
   BrowseQuery,
   BrowseResult,
   Listing,
+  ListingDetail,
   ListingSort,
+  PriceHistoryEntry,
 } from './marketplace-types';
 import type { Options } from '../types';
 
@@ -152,6 +154,49 @@ export function mockBrowse(query: BrowseQuery = {}): BrowseResult {
   const total = items.length;
   const start = (page - 1) * pageSize;
   return { items: items.slice(start, start + pageSize), total, page, pageSize };
+}
+
+/** Synthesises a small price-history trail for a fixture: listed ~28 days ago a
+ *  touch higher, then dropped to the current asking price. */
+function synthHistory(l: Listing): PriceHistoryEntry[] {
+  const created = new Date(l.createdAt);
+  const earlier = new Date(created.getTime() - 28 * 86_400_000).toISOString();
+  const initial = Math.round((l.askingPrice * 1.06) / 50) * 50;
+  return [
+    {
+      id: `${l.id}-h1`,
+      reason: 'created',
+      oldAskingPrice: null,
+      newAskingPrice: initial,
+      oldPredictedValue: null,
+      newPredictedValue: l.predictedValue,
+      oldPredictedLow: null,
+      newPredictedLow: l.predictedLow,
+      oldPredictedHigh: null,
+      newPredictedHigh: l.predictedHigh,
+      changedAt: earlier,
+    },
+    {
+      id: `${l.id}-h2`,
+      reason: 'asking_price_change',
+      oldAskingPrice: initial,
+      newAskingPrice: l.askingPrice,
+      oldPredictedValue: l.predictedValue,
+      newPredictedValue: l.predictedValue,
+      oldPredictedLow: l.predictedLow,
+      newPredictedLow: l.predictedLow,
+      oldPredictedHigh: l.predictedHigh,
+      newPredictedHigh: l.predictedHigh,
+      changedAt: l.createdAt,
+    },
+  ];
+}
+
+/** Mock GET /listings/:id — a fixture plus a synthesised price history. */
+export function mockListingDetail(id: string): ListingDetail | null {
+  const listing = LISTINGS.find((l) => l.id === id);
+  if (!listing) return null;
+  return { ...listing, priceHistory: synthHistory(listing) };
 }
 
 // MOCK: Beto — minimal /options fallback so the filter dropdowns populate when

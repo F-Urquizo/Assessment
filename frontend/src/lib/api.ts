@@ -1,5 +1,9 @@
 import type { Analysis, CompareResult, Options, Payload } from '../types';
-import type { BrowseQuery, BrowseResult } from './marketplace-types';
+import type {
+  BrowseQuery,
+  BrowseResult,
+  ListingDetail,
+} from './marketplace-types';
 import type { RecommendedListing } from './recommendations-types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -51,4 +55,9 @@ export function fetchListings(query: BrowseQuery = {}): Promise<BrowseResult> {
 /** GET /recommendations — top-N best-deal active listings with a "why" (public). */
 export function fetchRecommendations(limit = 8): Promise<RecommendedListing[]> {
   return request<RecommendedListing[]>(`/recommendations?limit=${limit}`);
+}
+
+/** GET /listings/:id — full listing detail incl. price history (public). */
+export function fetchListing(id: string): Promise<ListingDetail> {
+  return request<ListingDetail>(`/listings/${encodeURIComponent(id)}`);
 }

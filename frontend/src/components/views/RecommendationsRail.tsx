@@ -17,7 +17,11 @@ type RailState =
  * is unreachable. Renders nothing while loading or when there are no picks, so
  * it never leaves an empty band on the page.
  */
-export default function RecommendationsRail() {
+export default function RecommendationsRail({
+  onOpen,
+}: {
+  onOpen?: (id: string) => void;
+}) {
   const [state, setState] = useState<RailState>({ status: 'loading' });
 
   useEffect(() => {
@@ -46,20 +50,43 @@ export default function RecommendationsRail() {
       </div>
       <div className="recs-rail">
         {state.recs.map((rec) => (
-          <RecommendationCard key={rec.listing.id} rec={rec} />
+          <RecommendationCard key={rec.listing.id} rec={rec} onOpen={onOpen} />
         ))}
       </div>
     </section>
   );
 }
 
-function RecommendationCard({ rec }: { rec: RecommendedListing }) {
+function RecommendationCard({
+  rec,
+  onOpen,
+}: {
+  rec: RecommendedListing;
+  onOpen?: (id: string) => void;
+}) {
   const { listing, why } = rec;
   const title = `${listing.year} ${listing.manufacturer} ${listing.model}`.toUpperCase();
   const badge = listing.dealBadge ? DEAL_BADGE_META[listing.dealBadge] : null;
+  const open = onOpen ? () => onOpen(listing.id) : undefined;
 
   return (
-    <article className="rec-card">
+    <article
+      className="rec-card"
+      role={open ? 'button' : undefined}
+      tabIndex={open ? 0 : undefined}
+      aria-label={open ? `View ${title} details` : undefined}
+      onClick={open}
+      onKeyDown={
+        open
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="rec-card-head">
         <h3 className="rec-card-title">{title}</h3>
         {badge && <span className={`deal-badge ${badge.cls}`}>{badge.label}</span>}

@@ -323,3 +323,24 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--ink); 
 .rec-card-title { font-family: var(--serif); font-weight: 400; font-size: 19px; line-height: 1.1; letter-spacing: -.01em; }
 .rec-card-price { font-family: var(--serif); font-size: 27px; color: var(--green); line-height: 1; }
 .rec-card-why { font-size: 10.5px; line-height: 1.55; color: rgba(32,37,31,.65); margin-top: auto; }
+
+/* Clickable cards → listing detail (A3) */
+.listing-card[role="button"], .rec-card[role="button"] { cursor: pointer; }
+.listing-card[role="button"]:focus-visible, .rec-card[role="button"]:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+/* Listing detail (A3) */
+.detail-back { margin-top: 26px; display: inline-block; }
+.detail-title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; }
+.fav-btn { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; padding: 12px 20px; border: 1.5px solid var(--ink); background: var(--paper); cursor: pointer; color: var(--ink); white-space: nowrap; transition: all .15s; }
+.fav-btn:hover { border-color: var(--amber); color: var(--amber); }
+.fav-btn.on { background: var(--amber); border-color: var(--amber); color: var(--paper); }
+.fav-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.price-hist { list-style: none; margin-top: 4px; }
+.price-hist li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--rule-soft); }
+.price-hist li:last-child { border-bottom: none; }
+.ph-date { color: rgba(32,37,31,.55); font-size: 11px; min-width: 88px; }
+.ph-reason { flex: 1; font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
+.ph-price { font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ph-old { color: rgba(32,37,31,.45); font-weight: 400; }
+.contact-row { display: flex; gap: 11px; align-items: center; font-size: 14px; padding: 8px 0; }
+.contact-row a { color: var(--amber); text-decoration: underline; text-underline-offset: 3px; }
