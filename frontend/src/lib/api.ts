@@ -1,4 +1,5 @@
 import type { Analysis, CompareResult, Options, Payload } from '../types';
+import type { BrowseQuery, BrowseResult } from './marketplace-types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
@@ -29,4 +30,19 @@ export function compare(
   vehicles: Array<Payload & { _label: string }>,
 ): Promise<{ results: CompareResult[] }> {
   return postJson<{ results: CompareResult[] }>('/compare', { vehicles });
+}
+
+/** Serialises a browse query, dropping empty/undefined params. */
+function toQueryString(query: BrowseQuery): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+/** GET /listings — filtered, sorted, paged marketplace listings (public). */
+export function fetchListings(query: BrowseQuery = {}): Promise<BrowseResult> {
+  return request<BrowseResult>(`/listings${toQueryString(query)}`);
 }

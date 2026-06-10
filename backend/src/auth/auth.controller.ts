@@ -13,6 +13,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Request, Response } from 'express';
+import { ApiTags } from '@nestjs/swagger';
 import { Public } from './guards';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -21,6 +22,7 @@ import { RegisterDto } from './dto/register.dto';
 // All /auth/* routes are public — they authenticate by credentials/cookie,
 // not by Bearer token. This covers current routes and future ones (refresh,
 // logout, verify-email) added in later steps.
+@ApiTags('auth')
 @Public()
 @Controller('auth')
 export class AuthController {

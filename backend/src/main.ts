@@ -4,6 +4,7 @@ import { HttpStatus, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -55,6 +56,35 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN ?? true,
     credentials: true,
   });
+
+  // ── API docs (Swagger / OpenAPI) ──
+  // UI at /docs, raw OpenAPI JSON at /docs-json. Request DTOs are auto-documented
+  // by the @nestjs/swagger CLI plugin (see nest-cli.json) — no per-field
+  // decorators needed. Opt out with SWAGGER_ENABLED=false (e.g. in production).
+  if (process.env.SWAGGER_ENABLED !== 'false') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Assessment API')
+      .setDescription(
+        'Used-car marketplace API — auth, listings, valuation and admin. ' +
+          'Browsing listings is public; mutations require a Bearer access token.',
+      )
+      .setVersion('1.0')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+        'access-token',
+      )
+      .addCookieAuth('refresh')
+      .addTag('auth', 'Registration, login, token refresh and email verification')
+      .addTag('listings', 'Marketplace listings — browse (public) and CRUD (owner)')
+      .addTag('model', 'Model-service valuation proxy (options, predict, analyze)')
+      .addTag('admin', 'Admin-only endpoints')
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('docs', app, document, {
+      customSiteTitle: 'Assessment API — Docs',
+      swaggerOptions: { persistAuthorization: true },
+    });
+  }
 
   const port = Number(process.env.PORT ?? (tlsMode === 'direct' ? 3443 : 3000));
   await app.listen(port);
