@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# TLS certificates — generated locally, never committed
+certs/
+
+# Coverage reports
+coverage/
+
+# Prisma generated client (re-generated via postinstall)
+# Uncomment if you prefer to not commit generated code:
+# node_modules/.prisma/
