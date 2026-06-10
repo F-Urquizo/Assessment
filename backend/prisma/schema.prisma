@@ -23,6 +23,8 @@ enum AuditEvent {
   refresh_reuse_detected
   email_verified
   role_changed
+}
+
 enum ListingStatus {
   draft
   active
