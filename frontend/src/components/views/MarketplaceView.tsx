@@ -10,6 +10,7 @@ import {
   type Filters,
 } from '../../lib/marketplace-filters';
 import ListingCard from './ListingCard';
+import RecommendationsRail from './RecommendationsRail';
 
 const PAGE_SIZE = 12;
 
@@ -79,6 +80,8 @@ export default function MarketplaceView({ options }: { options: Options }) {
           automatically once the API is up.
         </div>
       )}
+
+      <RecommendationsRail />
 
       <FilterBar options={options} filters={filters} onChange={patchFilters} />
 
