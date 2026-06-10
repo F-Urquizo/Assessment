@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { NavLink, Route, Routes } from 'react-router-dom';
 import Studio from './components/Studio';
 import Marketplace from './components/Marketplace';
 import Favorites from './components/Favorites';
@@ -8,17 +9,14 @@ import { fetchOptions } from './lib/api';
 import { MOCK_OPTIONS } from './lib/marketplace-mock';
 import type { Options } from './types';
 
-type Mode = 'marketplace' | 'favorites' | 'studio';
-
-const TABS: ReadonlyArray<{ id: Mode; label: string }> = [
-  { id: 'marketplace', label: 'Marketplace' },
-  { id: 'favorites', label: 'Favorites' },
-  { id: 'studio', label: 'Studio' },
+const TABS: ReadonlyArray<{ to: string; label: string }> = [
+  { to: '/', label: 'Marketplace' },
+  { to: '/favorites', label: 'Favorites' },
+  { to: '/studio', label: 'Studio' },
 ];
 
 export default function App() {
   const [options, setOptions] = useState<Options | null>(null);
-  const [mode, setMode] = useState<Mode>('marketplace');
 
   useEffect(() => {
     // Degrade gracefully: if /options is unreachable, fall back to MOCK_OPTIONS so
@@ -37,23 +35,24 @@ export default function App() {
     // swaps to Ramiro's real provider via context/auth-provider.ts (one line).
     <AuthProvider>
       <FavoritesProvider>
-        {/* TEMP nav — Ramiro owns the real nav/routing integration (auth shell). */}
-        <div className="mode-nav" role="tablist" aria-label="App section">
+        <nav className="mode-nav" aria-label="App section">
           {TABS.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={mode === t.id}
-              className={'mode-tab' + (mode === t.id ? ' active' : '')}
-              onClick={() => setMode(t.id)}
+            <NavLink
+              key={t.to}
+              to={t.to}
+              end={t.to === '/'}
+              className={({ isActive }) => 'mode-tab' + (isActive ? ' active' : '')}
             >
               {t.label}
-            </button>
+            </NavLink>
           ))}
-        </div>
-        {mode === 'marketplace' && <Marketplace options={options} />}
-        {mode === 'favorites' && <Favorites />}
-        {mode === 'studio' && <Studio options={options} />}
+        </nav>
+        <Routes>
+          <Route path="/" element={<Marketplace options={options} />} />
+          <Route path="/favorites" element={<Favorites />} />
+          <Route path="/studio" element={<Studio options={options} />} />
+          {/* Auth routes (/login, /register, /verify-email) land in later steps. */}
+        </Routes>
       </FavoritesProvider>
     </AuthProvider>
   );

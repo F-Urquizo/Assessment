@@ -277,7 +277,7 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--ink); 
 
 /* TEMP top-level section switch — replaced by Ramiro's real nav. */
 .mode-nav { position: fixed; top: 16px; right: 18px; z-index: 1000; display: flex; border: 1.5px solid var(--ink); background: var(--paper-dark); box-shadow: 3px 3px 0 var(--amber); }
-.mode-tab { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; padding: 9px 16px; border: none; background: none; cursor: pointer; color: rgba(32,37,31,.55); transition: color .15s; }
+.mode-tab { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; padding: 9px 16px; border: none; background: none; cursor: pointer; color: rgba(32,37,31,.55); transition: color .15s; text-decoration: none; display: inline-block; }
 .mode-tab:hover { color: var(--ink); }
 .mode-tab.active { background: var(--green); color: var(--paper); }
 .mode-tab:focus-visible, .mkt-pager .linkbtn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
