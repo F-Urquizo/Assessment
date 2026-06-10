@@ -8,6 +8,12 @@ import type {
 } from './marketplace-types';
 import type { RecommendedListing } from './recommendations-types';
 import { authRequest } from './auth-request';
+import type {
+  LoginResponse,
+  RefreshResponse,
+  RegisterResponse,
+  VerifyEmailResponse,
+} from './auth-types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
@@ -94,41 +100,75 @@ export function removeFavorite(
   });
 }
 
-// ── My listings / Sell (require auth) ──
+// ── Auth (Ramiro) — see docs/API_CONTRACT.md ─────────────────────────────────
+//
+// These use their own helper instead of request<T>() because auth pages must
+// branch on the HTTP status (401 invalid credentials, 403 unverified, 409
+// email taken, 422 validation list) and NestJS puts the human message in
+// `message`, not `error`. All auth calls send credentials so the httpOnly
+// refresh cookie travels with them.
 
-/** GET /listings/mine — the current user's listings, any status. */
-export function fetchMyListings(token: string | null): Promise<Listing[]> {
-  return authRequest<Listing[]>('/listings/mine', token);
+/** Error carrying the NestJS envelope so callers can branch on statusCode. */
+export class AuthApiError extends Error {
+  readonly statusCode: number;
+  /** string[] when class-validator fires, plain string otherwise. */
+  readonly messages: string | string[];
+
+  constructor(statusCode: number, messages: string | string[]) {
+    super(Array.isArray(messages) ? messages.join('. ') : messages);
+    this.name = 'AuthApiError';
+    this.statusCode = statusCode;
+    this.messages = messages;
+  }
 }
 
-/** POST /listings — create a listing. */
-export function createListing(
-  input: ListingInput,
-  token: string | null,
-): Promise<Listing> {
-  return authRequest<Listing>('/listings', token, {
+async function authJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, { ...init, credentials: 'include' });
+  if (res.status === 204) return undefined as T;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const body = data as { statusCode?: number; message?: string | string[] };
+    throw new AuthApiError(
+      body.statusCode ?? res.status,
+      body.message ?? `request to ${path} failed`,
+    );
+  }
+  return data as T;
+}
+
+function authPost<T>(path: string, body?: unknown): Promise<T> {
+  return authJson<T>(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
+    ...(body !== undefined && {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
   });
 }
 
-/** PATCH /listings/:id — update a listing. */
-export function updateListing(
-  id: string,
-  input: Partial<ListingInput>,
-  token: string | null,
-): Promise<Listing> {
-  return authRequest<Listing>(`/listings/${encodeURIComponent(id)}`, token, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
+/** POST /auth/register → 201. No tokens issued; user must verify email then log in. */
+export function register(email: string, password: string): Promise<RegisterResponse> {
+  return authPost<RegisterResponse>('/auth/register', { email, password });
 }
 
-/** DELETE /listings/:id — delete a listing. */
-export function deleteListing(id: string, token: string | null): Promise<void> {
-  return authRequest<void>(`/listings/${encodeURIComponent(id)}`, token, {
-    method: 'DELETE',
-  });
+/** POST /auth/login → 200 with access token (memory only) + httpOnly refresh cookie. */
+export function login(email: string, password: string): Promise<LoginResponse> {
+  return authPost<LoginResponse>('/auth/login', { email, password });
+}
+
+/** POST /auth/refresh → 200. Rotates the refresh cookie, returns a new access token. */
+export function refreshAccessToken(): Promise<RefreshResponse> {
+  return authPost<RefreshResponse>('/auth/refresh');
+}
+
+/** POST /auth/logout → 204. Revokes the refresh token and clears the cookie. */
+export function logout(): Promise<void> {
+  return authPost<void>('/auth/logout');
+}
+
+/** GET /auth/verify-email?token=... → 200, or 400/410 for invalid/expired/used. */
+export function verifyEmail(token: string): Promise<VerifyEmailResponse> {
+  return authJson<VerifyEmailResponse>(
+    `/auth/verify-email?token=${encodeURIComponent(token)}`,
+  );
 }
