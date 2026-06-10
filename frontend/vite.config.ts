@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // The frontend calls the same relative API paths the old Flask app used
@@ -11,9 +11,17 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: Object.fromEntries(
-      ['/analyze', '/compare', '/predict', '/api', '/options', '/health'].map(
+      ['/analyze', '/compare', '/predict', '/api', '/options', '/health', '/listings'].map(
         (p) => [p, { target: API_TARGET, changeOrigin: true }],
       ),
     ),
+  },
+  // Vitest config — jsdom + Testing Library. css:false skips importing studio.css
+  // into the test runtime (components are tested for behaviour, not pixels).
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    css: false,
   },
 })
