@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
+import { ListingsModule } from './listings/listings.module';
 import { ModelController } from './model/model.controller';
 import { ModelService } from './model/model.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -12,6 +13,7 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     UsersModule,
     AuthModule,
+    ListingsModule,
   ],
   controllers: [ModelController],
   providers: [ModelService],
