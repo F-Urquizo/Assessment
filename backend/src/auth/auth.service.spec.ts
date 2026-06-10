@@ -5,24 +5,35 @@ jest.mock('argon2', () => ({
   verify: jest.fn(),
 }));
 
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  GoneException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { Prisma, Role } from '@prisma/client';
+import { AuditEvent, Prisma, Role } from '@prisma/client';
 import { hash as argon2hash, verify as argon2verify } from 'argon2';
 import { createHash } from 'node:crypto';
-import { AuthService } from './auth.service';
+import { AuditService } from '../audit/audit.service';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { AuthService } from './auth.service';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
+// emailVerified=true so login tests pass the gate by default.
+// Override to { ...baseUser, emailVerified: false } in gate-specific tests.
 const baseUser = {
   id: 'cuid_test',
   email: 'user@example.com',
   passwordHash: '$argon2id$stored_hash',
   role: Role.user,
-  emailVerified: false,
+  emailVerified: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -31,7 +42,7 @@ const publicUser = {
   id: baseUser.id,
   email: baseUser.email,
   role: baseUser.role,
-  emailVerified: baseUser.emailVerified,
+  emailVerified: true,
 };
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -54,7 +65,27 @@ const prismaMock = {
     update: jest.fn().mockResolvedValue({}),
     updateMany: jest.fn().mockResolvedValue({ count: 0 }),
   },
+  emailVerificationToken: {
+    create: jest.fn().mockResolvedValue({}),
+    findFirst: jest.fn(),
+    update: jest.fn().mockResolvedValue({}),
+  },
+  user: {
+    update: jest.fn().mockResolvedValue({}),
+  },
   $transaction: jest.fn(),
+};
+
+const mailMock = {
+  sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+};
+
+const auditMock = {
+  log: jest.fn().mockResolvedValue(undefined),
+};
+
+const configMock = {
+  get: jest.fn().mockImplementation((_key: string, fallback: unknown) => fallback),
 };
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
@@ -69,6 +100,9 @@ describe('AuthService', () => {
         { provide: UsersService, useValue: usersMock },
         { provide: JwtService, useValue: jwtMock },
         { provide: PrismaService, useValue: prismaMock },
+        { provide: MailService, useValue: mailMock },
+        { provide: ConfigService, useValue: configMock },
+        { provide: AuditService, useValue: auditMock },
       ],
     }).compile();
 
@@ -82,18 +116,24 @@ describe('AuthService', () => {
     prismaMock.refreshToken.create.mockResolvedValue({});
     prismaMock.refreshToken.update.mockResolvedValue({});
     prismaMock.refreshToken.updateMany.mockResolvedValue({ count: 0 });
-    // $transaction calls the callback with prismaMock as the transaction client.
+    prismaMock.emailVerificationToken.create.mockResolvedValue({});
+    prismaMock.emailVerificationToken.update.mockResolvedValue({});
+    prismaMock.user.update.mockResolvedValue({});
+    // $transaction passes prismaMock as the transaction client.
     prismaMock.$transaction.mockImplementation((fn: any) => fn(prismaMock));
     usersMock.toPublic.mockReturnValue(publicUser);
     usersMock.findById.mockResolvedValue(baseUser);
+    mailMock.sendVerificationEmail.mockResolvedValue(undefined);
+    auditMock.log.mockResolvedValue(undefined);
+    configMock.get.mockImplementation((_key: string, fallback: unknown) => fallback);
   });
 
   // ── register ──────────────────────────────────────────────────────────────
 
   describe('register', () => {
-    it('hashes the password with argon2id before storing', async () => {
-      usersMock.create.mockResolvedValue(baseUser);
+    beforeEach(() => usersMock.create.mockResolvedValue(baseUser));
 
+    it('hashes the password with argon2id before storing', async () => {
       await service.register({ email: 'a@b.com', password: 'password123' });
 
       expect(argon2hash).toHaveBeenCalledWith(
@@ -106,8 +146,6 @@ describe('AuthService', () => {
     });
 
     it('returns { user } without passwordHash', async () => {
-      usersMock.create.mockResolvedValue(baseUser);
-
       const result = await service.register({ email: 'a@b.com', password: 'password123' });
 
       expect(result.user).toEqual(publicUser);
@@ -137,12 +175,49 @@ describe('AuthService', () => {
         service.register({ email: 'a@b.com', password: 'password123' }),
       ).rejects.toThrow(other);
     });
+
+    it('creates an email verification token with a 64-char SHA-256 hash', async () => {
+      await service.register({ email: 'a@b.com', password: 'password123' });
+
+      expect(prismaMock.emailVerificationToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: baseUser.id,
+          tokenHash: expect.any(String),
+          expiresAt: expect.any(Date),
+        }),
+      });
+      const storedHash: string =
+        (prismaMock.emailVerificationToken.create as jest.Mock).mock.calls[0][0].data.tokenHash;
+      expect(storedHash).toHaveLength(64);
+    });
+
+    it('calls sendVerificationEmail with a link containing the raw token', async () => {
+      await service.register({ email: 'a@b.com', password: 'password123' });
+
+      expect(mailMock.sendVerificationEmail).toHaveBeenCalledWith(
+        baseUser.email,
+        expect.stringContaining('/verify-email?token='),
+      );
+    });
+
+    it('stored hash is the SHA-256 of the raw token in the link', async () => {
+      await service.register({ email: 'a@b.com', password: 'password123' });
+
+      const link: string = (mailMock.sendVerificationEmail as jest.Mock).mock.calls[0][1];
+      const rawInLink = link.split('?token=')[1];
+      const expectedHash = createHash('sha256').update(rawInLink).digest('hex');
+      const storedHash: string =
+        (prismaMock.emailVerificationToken.create as jest.Mock).mock.calls[0][0].data.tokenHash;
+
+      expect(storedHash).toBe(expectedHash);
+      expect(rawInLink).not.toBe(storedHash);
+    });
   });
 
   // ── login ─────────────────────────────────────────────────────────────────
 
   describe('login', () => {
-    it('returns accessToken, rawRefresh and public user on valid credentials', async () => {
+    it('returns accessToken, rawRefresh and public user for a verified account', async () => {
       usersMock.findByEmail.mockResolvedValue(baseUser);
 
       const result = await service.login({ email: 'user@example.com', password: 'password123' });
@@ -176,16 +251,13 @@ describe('AuthService', () => {
           expiresAt: expect.any(Date),
         }),
       });
-
       const savedHash: string =
         (prismaMock.refreshToken.create as jest.Mock).mock.calls[0][0].data.tokenHash;
-      // The stored value must be a hash, not the raw token.
       expect(savedHash).not.toBe(result.rawRefresh);
-      // SHA-256 hex is always 64 chars.
       expect(savedHash).toHaveLength(64);
     });
 
-    it('throws 401 UnauthorizedException when email is not found', async () => {
+    it('throws 401 when email is not found', async () => {
       usersMock.findByEmail.mockResolvedValue(null);
 
       await expect(
@@ -193,7 +265,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('throws 401 UnauthorizedException on wrong password', async () => {
+    it('throws 401 on wrong password', async () => {
       usersMock.findByEmail.mockResolvedValue(baseUser);
       (argon2verify as jest.Mock).mockResolvedValue(false);
 
@@ -202,12 +274,135 @@ describe('AuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    it('throws 403 when email is not verified', async () => {
+      usersMock.findByEmail.mockResolvedValue({ ...baseUser, emailVerified: false });
+
+      await expect(
+        service.login({ email: 'user@example.com', password: 'password123' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('never includes passwordHash in the returned user', async () => {
       usersMock.findByEmail.mockResolvedValue(baseUser);
 
       const result = await service.login({ email: 'user@example.com', password: 'password123' });
 
       expect(result.user).not.toHaveProperty('passwordHash');
+    });
+
+    it('logs login_success with userId and context on valid credentials', async () => {
+      usersMock.findByEmail.mockResolvedValue(baseUser);
+
+      await service.login(
+        { email: 'user@example.com', password: 'password123' },
+        { ip: '1.2.3.4', userAgent: 'jest' },
+      );
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.login_success,
+          userId: baseUser.id,
+          ip: '1.2.3.4',
+          userAgent: 'jest',
+        }),
+      );
+    });
+
+    it('logs login_failure with null userId and email in metadata when user not found', async () => {
+      usersMock.findByEmail.mockResolvedValue(null);
+
+      await expect(
+        service.login({ email: 'ghost@example.com', password: 'pass' }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.login_failure,
+          userId: null,
+          metadata: expect.objectContaining({ email: 'ghost@example.com' }),
+        }),
+      );
+    });
+
+    it('logs login_failure with userId when password is wrong', async () => {
+      usersMock.findByEmail.mockResolvedValue(baseUser);
+      (argon2verify as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.login({ email: 'user@example.com', password: 'bad' }),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.login_failure,
+          userId: baseUser.id,
+        }),
+      );
+    });
+  });
+
+  // ── verifyEmail ───────────────────────────────────────────────────────────
+
+  describe('verifyEmail', () => {
+    const RAW = 'e'.repeat(64);
+    const TOKEN_HASH = createHash('sha256').update(RAW).digest('hex');
+
+    const validToken = {
+      id: 'evt-cuid',
+      userId: baseUser.id,
+      tokenHash: TOKEN_HASH,
+      expiresAt: new Date(Date.now() + 100_000),
+      usedAt: null,
+      createdAt: new Date(),
+    };
+
+    it('marks the token used and the user verified in a transaction', async () => {
+      prismaMock.emailVerificationToken.findFirst.mockResolvedValue(validToken);
+
+      await service.verifyEmail(RAW);
+
+      expect(prismaMock.emailVerificationToken.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: validToken.id },
+          data: expect.objectContaining({ usedAt: expect.any(Date) }),
+        }),
+      );
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: baseUser.id },
+        data: { emailVerified: true },
+      });
+    });
+
+    it('second call with the same token throws 410 (single-use)', async () => {
+      // Simulate a token that was already used.
+      prismaMock.emailVerificationToken.findFirst.mockResolvedValue({
+        ...validToken,
+        usedAt: new Date(),
+      });
+
+      await expect(service.verifyEmail(RAW)).rejects.toThrow(GoneException);
+      // User update must NOT be called again.
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
+    });
+
+    it('throws 400 when token is not found', async () => {
+      prismaMock.emailVerificationToken.findFirst.mockResolvedValue(null);
+
+      await expect(service.verifyEmail(RAW)).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws 410 when token is expired', async () => {
+      prismaMock.emailVerificationToken.findFirst.mockResolvedValue({
+        ...validToken,
+        expiresAt: new Date(Date.now() - 1_000),
+      });
+
+      await expect(service.verifyEmail(RAW)).rejects.toThrow(GoneException);
+    });
+
+    it('throws 400 for an empty/falsy token without hitting the database', async () => {
+      await expect(service.verifyEmail('')).rejects.toThrow(BadRequestException);
+      expect(prismaMock.emailVerificationToken.findFirst).not.toHaveBeenCalled();
     });
   });
 
@@ -311,6 +506,38 @@ describe('AuthService', () => {
         sub: baseUser.id,
         role: baseUser.role,
       });
+    });
+
+    it('logs token_rotated with userId and familyId after successful rotation', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue(validStored);
+
+      await service.refresh(RAW, { ip: '1.1.1.1' });
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.token_rotated,
+          userId: baseUser.id,
+          metadata: expect.objectContaining({ familyId: FAMILY_ID }),
+          ip: '1.1.1.1',
+        }),
+      );
+    });
+
+    it('logs refresh_reuse_detected with familyId before throwing 401', async () => {
+      prismaMock.refreshToken.findFirst.mockResolvedValue({
+        ...validStored,
+        revokedAt: new Date(),
+      });
+
+      await expect(service.refresh(RAW)).rejects.toThrow(UnauthorizedException);
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.refresh_reuse_detected,
+          userId: baseUser.id,
+          metadata: expect.objectContaining({ familyId: FAMILY_ID }),
+        }),
+      );
     });
   });
 

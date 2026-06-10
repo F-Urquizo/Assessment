@@ -14,6 +14,15 @@ enum Role {
   admin
 }
 
+enum AuditEvent {
+  register
+  login_success
+  login_failure
+  logout
+  token_rotated
+  refresh_reuse_detected
+  email_verified
+  role_changed
 enum ListingStatus {
   draft
   active
@@ -37,8 +46,9 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  refreshTokens          RefreshToken[]
+  refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
+  auditLogs               AuditLog[]
   listings               Listing[]
 
   @@index([email])
@@ -159,4 +169,26 @@ model EmailVerificationToken {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tokenHash])
+}
+
+// AuditLog
+// Append-only event store for auth events. userId is NULLABLE so that events
+// with no associated user (e.g. login_failure for unknown email) can be stored,
+// and so rows survive user deletion (onDelete: SetNull, not Cascade).
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String?
+  event     AuditEvent
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("auth_audit_log")
 }

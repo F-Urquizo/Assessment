@@ -17,6 +17,7 @@ const authMock = {
   login: jest.fn(),
   refresh: jest.fn(),
   logout: jest.fn(),
+  verifyEmail: jest.fn(),
 };
 
 const configMock = {
@@ -28,7 +29,11 @@ function makeRes() {
 }
 
 function makeReq(cookieValue?: string) {
-  return { cookies: cookieValue !== undefined ? { refresh: cookieValue } : {} };
+  return {
+    cookies: cookieValue !== undefined ? { refresh: cookieValue } : {},
+    headers: {},
+    ip: '127.0.0.1',
+  };
 }
 
 describe('AuthController', () => {
@@ -73,6 +78,8 @@ describe('AuthController', () => {
   // ── login ─────────────────────────────────────────────────────────────────
 
   describe('POST /auth/login', () => {
+    const mockLoginReq = { ip: '127.0.0.1', headers: { 'user-agent': 'jest' } };
+
     it('sets an httpOnly cookie named "refresh" with the raw token', async () => {
       authMock.login.mockResolvedValue({
         accessToken: 'jwt.token',
@@ -81,7 +88,7 @@ describe('AuthController', () => {
       });
       const res = makeRes();
 
-      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, mockLoginReq as any, res as any);
 
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
@@ -98,7 +105,7 @@ describe('AuthController', () => {
       });
       const res = makeRes();
 
-      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, mockLoginReq as any, res as any);
 
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
@@ -117,6 +124,7 @@ describe('AuthController', () => {
 
       const result = await controller.login(
         { email: 'user@example.com', password: 'pass1234' },
+        mockLoginReq as any,
         res as any,
       );
 
@@ -137,7 +145,7 @@ describe('AuthController', () => {
       });
       const res = makeRes();
 
-      await controller.login({ email: 'user@example.com', password: 'pass1234' }, res as any);
+      await controller.login({ email: 'user@example.com', password: 'pass1234' }, mockLoginReq as any, res as any);
 
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
@@ -159,7 +167,7 @@ describe('AuthController', () => {
 
       const result = await controller.refresh(makeReq('old_raw') as any, res as any);
 
-      expect(authMock.refresh).toHaveBeenCalledWith('old_raw');
+      expect(authMock.refresh).toHaveBeenCalledWith('old_raw', expect.objectContaining({ ip: '127.0.0.1' }));
       expect(res.cookie).toHaveBeenCalledWith(
         'refresh',
         'new_raw',
@@ -195,7 +203,7 @@ describe('AuthController', () => {
 
       await controller.logout(makeReq('raw_token') as any, res as any);
 
-      expect(authMock.logout).toHaveBeenCalledWith('raw_token');
+      expect(authMock.logout).toHaveBeenCalledWith('raw_token', expect.objectContaining({ ip: '127.0.0.1' }));
       expect(res.clearCookie).toHaveBeenCalledWith(
         'refresh',
         expect.objectContaining({ path: '/auth', httpOnly: true }),
@@ -216,8 +224,31 @@ describe('AuthController', () => {
 
       await controller.logout(makeReq() as any, res as any);
 
-      expect(authMock.logout).toHaveBeenCalledWith(undefined);
+      expect(authMock.logout).toHaveBeenCalledWith(undefined, expect.any(Object));
       expect(res.clearCookie).toHaveBeenCalled();
+    });
+  });
+
+  // ── verify-email ──────────────────────────────────────────────────────────
+
+  describe('GET /auth/verify-email', () => {
+    it('calls verifyEmail with the token query param and returns { verified: true }', async () => {
+      authMock.verifyEmail.mockResolvedValue(undefined);
+
+      const result = await controller.verifyEmail('some-raw-token');
+
+      expect(authMock.verifyEmail).toHaveBeenCalledWith('some-raw-token');
+      expect(result).toEqual({ verified: true });
+    });
+
+    it('passes empty string to service when token query param is absent', async () => {
+      authMock.verifyEmail.mockResolvedValue(undefined);
+
+      // The service throws BadRequestException for empty tokens; controller
+      // just forwards whatever @Query('token') provides.
+      await controller.verifyEmail(undefined as any);
+
+      expect(authMock.verifyEmail).toHaveBeenCalledWith(undefined);
     });
   });
 });

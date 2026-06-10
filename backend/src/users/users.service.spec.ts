@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Role } from '@prisma/client';
+import { AuditEvent, Role } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from './users.service';
 
@@ -11,6 +12,8 @@ const prismaMock = {
     update: jest.fn(),
   },
 };
+
+const auditMock = { log: jest.fn().mockResolvedValue(undefined) };
 
 const baseUser = {
   id: 'cuid_test',
@@ -30,11 +33,13 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: AuditService, useValue: auditMock },
       ],
     }).compile();
 
     service = module.get(UsersService);
     jest.clearAllMocks();
+    auditMock.log.mockResolvedValue(undefined);
   });
 
   // ── findByEmail ────────────────────────────────────────────────────────────
@@ -119,6 +124,36 @@ describe('UsersService', () => {
         where: { id: 'cuid_test' },
         data: { emailVerified: true },
       });
+    });
+  });
+
+  // ── setRole ───────────────────────────────────────────────────────────────
+
+  describe('setRole', () => {
+    it('updates the role in the database', async () => {
+      prismaMock.user.update.mockResolvedValue({ ...baseUser, role: Role.admin });
+
+      await service.setRole('cuid_test', Role.admin);
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: 'cuid_test' },
+        data: { role: Role.admin },
+      });
+    });
+
+    it('logs role_changed with the new role in metadata', async () => {
+      prismaMock.user.update.mockResolvedValue({ ...baseUser, role: Role.admin });
+
+      await service.setRole('cuid_test', Role.admin, { ip: '10.0.0.1' });
+
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: AuditEvent.role_changed,
+          userId: 'cuid_test',
+          metadata: expect.objectContaining({ newRole: Role.admin }),
+          ip: '10.0.0.1',
+        }),
+      );
     });
   });
 
