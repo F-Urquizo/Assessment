@@ -3,13 +3,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Listing, ListingStatus, Prisma } from '@prisma/client';
+import {
+  Listing,
+  ListingPriceHistory,
+  ListingStatus,
+  Prisma,
+  PriceChangeReason,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModelService } from '../model/model.service';
 import type { RequestUser } from '../auth/jwt.strategy';
 import { computeDealDeltaPct, DealBadge, dealBadge } from './deal';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
+import { BrowseListingsDto, Sort } from './dto/browse-listings.dto';
 import { SPEC_FIELDS, SpecField } from './dto/spec-options';
 
 /** Anything carrying the 13 spec fields — a DTO, a Listing row, or a merge. */
@@ -17,6 +24,19 @@ type SpecInput = Partial<Record<SpecField, unknown>>;
 
 /** A listing enriched with its derived Under/Fair/Over badge for the client. */
 export type ListingView = Listing & { dealBadge: DealBadge | null };
+
+/** The single-listing detail view: the listing plus its price/valuation trend. */
+export type ListingDetailView = ListingView & {
+  priceHistory: ListingPriceHistory[];
+};
+
+/** A page of marketplace results plus the metadata the UI needs to paginate. */
+export type BrowseResult = {
+  items: ListingView[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
 
 /** Result of a model-service valuation, mapped to the columns we persist. */
 type Valuation = {
@@ -60,13 +80,32 @@ export class ListingsService {
       valuation.predictedValue,
     );
 
-    const listing = await this.prisma.listing.create({
-      data: {
-        ...this.writable(dto),
-        ...valuation,
-        dealDeltaPct,
-        userId: user.id,
-      } as Prisma.ListingUncheckedCreateInput,
+    // Listing write + its initial audit row commit together (or not at all),
+    // so a price never exists without the history row that explains it.
+    const listing = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.listing.create({
+        data: {
+          ...this.writable(dto),
+          ...valuation,
+          dealDeltaPct,
+          userId: user.id,
+        } as Prisma.ListingUncheckedCreateInput,
+      });
+      await tx.listingPriceHistory.create({
+        data: {
+          listingId: created.id,
+          reason: PriceChangeReason.created,
+          oldAskingPrice: null,
+          newAskingPrice: created.askingPrice,
+          oldPredictedValue: null,
+          newPredictedValue: created.predictedValue,
+          oldPredictedLow: null,
+          newPredictedLow: created.predictedLow,
+          oldPredictedHigh: null,
+          newPredictedHigh: created.predictedHigh,
+        },
+      });
+      return created;
     });
     return this.toView(listing);
   }
@@ -84,21 +123,34 @@ export class ListingsService {
 
     // The valuation only depends on the spec fields. Re-call the model only
     // when one of them actually changed; otherwise reuse the stored value.
-    let predictedValue = existing.predictedValue;
+    let valuation: Valuation = {
+      predictedValue: existing.predictedValue,
+      predictedLow: existing.predictedLow,
+      predictedHigh: existing.predictedHigh,
+    };
     if (this.specChanged(existing, dto)) {
-      const valuation = await this.valuate({ ...existing, ...dto });
+      valuation = await this.valuate({ ...existing, ...dto });
       Object.assign(data, valuation);
-      predictedValue = valuation.predictedValue;
     }
 
     // The deal delta depends on both asking price and predicted value, so it's
     // always recomputed from whichever values now apply.
     const askingPrice = dto.askingPrice ?? existing.askingPrice;
-    data.dealDeltaPct = computeDealDeltaPct(askingPrice, predictedValue);
+    data.dealDeltaPct = computeDealDeltaPct(
+      askingPrice,
+      valuation.predictedValue,
+    );
 
-    const listing = await this.prisma.listing.update({
-      where: { id },
-      data: data,
+    const historyRow = this.diffHistoryRow(existing, askingPrice, valuation);
+
+    // Update the listing and append its audit row atomically — the price and
+    // the row that explains the change always land together.
+    const listing = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.listing.update({ where: { id }, data });
+      if (historyRow) {
+        await tx.listingPriceHistory.create({ data: historyRow });
+      }
+      return updated;
     });
     return this.toView(listing);
   }
@@ -111,8 +163,15 @@ export class ListingsService {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
 
-  async findOne(id: string): Promise<ListingView> {
-    return this.toView(await this.requireListing(id));
+  async findOne(id: string): Promise<ListingDetailView> {
+    const listing = await this.prisma.listing.findUnique({
+      where: { id },
+      include: { priceHistory: { orderBy: { changedAt: 'asc' } } },
+    });
+    if (!listing) throw new NotFoundException('listing not found');
+
+    const { priceHistory, ...row } = listing;
+    return { ...this.toView(row), priceHistory };
   }
 
   /**
@@ -134,7 +193,105 @@ export class ListingsService {
     return listings.map((l) => this.toView(l));
   }
 
+  /**
+   * Filtered, sorted, paged active listings for the marketplace browse page.
+   * `findActive` stays the simple seam Fran's recommendations use; this is the
+   * richer query the UI drives.
+   */
+  async browse(query: BrowseListingsDto): Promise<BrowseResult> {
+    const where = this.browseWhere(query);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+
+    // findMany + count run in one transaction so `total` reflects the same
+    // filtered snapshot as the returned page.
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.listing.findMany({
+        where,
+        orderBy: this.browseOrderBy(query.sort ?? 'newest'),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.listing.count({ where }),
+    ]);
+
+    return { items: rows.map((l) => this.toView(l)), total, page, pageSize };
+  }
+
+  /** The append-only price/valuation trail for a listing, oldest → newest. */
+  async priceHistory(listingId: string): Promise<ListingPriceHistory[]> {
+    return this.prisma.listingPriceHistory.findMany({
+      where: { listingId },
+      orderBy: { changedAt: 'asc' },
+    });
+  }
+
   // ── Internals ─────────────────────────────────────────────────────────────────
+
+  /** Builds the `where` for a browse query — always pinned to active listings. */
+  private browseWhere(query: BrowseListingsDto): Prisma.ListingWhereInput {
+    const where: Prisma.ListingWhereInput = { status: ListingStatus.active };
+    if (query.make) where.manufacturer = query.make;
+    if (query.type) where.type = query.type;
+    if (query.state) where.state = query.state;
+
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      const askingPrice: Prisma.IntFilter = {};
+      if (query.minPrice !== undefined) askingPrice.gte = query.minPrice;
+      if (query.maxPrice !== undefined) askingPrice.lte = query.maxPrice;
+      where.askingPrice = askingPrice;
+    }
+    return where;
+  }
+
+  /** Maps a sort mode to the Prisma `orderBy`. `bestDeal` floats the most
+   *  underpriced cars first and pushes un-valuated ones (null delta) to the end. */
+  private browseOrderBy(sort: Sort): Prisma.ListingOrderByWithRelationInput {
+    switch (sort) {
+      case 'priceAsc':
+        return { askingPrice: 'asc' };
+      case 'priceDesc':
+        return { askingPrice: 'desc' };
+      case 'bestDeal':
+        return { dealDeltaPct: { sort: 'asc', nulls: 'last' } };
+      case 'newest':
+      default:
+        return { createdAt: 'desc' };
+    }
+  }
+
+  /**
+   * Builds the audit row for an update, or `null` when neither the asking price
+   * nor the valuation moved (nothing worth recording). `revaluation` wins when
+   * any valuation field changed — it's the more informative single row.
+   */
+  private diffHistoryRow(
+    existing: Listing,
+    newAskingPrice: number,
+    newValuation: Valuation,
+  ): Prisma.ListingPriceHistoryUncheckedCreateInput | null {
+    const priceChanged = newAskingPrice !== existing.askingPrice;
+    const valuationChanged =
+      newValuation.predictedValue !== existing.predictedValue ||
+      newValuation.predictedLow !== existing.predictedLow ||
+      newValuation.predictedHigh !== existing.predictedHigh;
+    if (!priceChanged && !valuationChanged) return null;
+
+    return {
+      listingId: existing.id,
+      reason: valuationChanged
+        ? PriceChangeReason.revaluation
+        : PriceChangeReason.asking_price_change,
+      oldAskingPrice: existing.askingPrice,
+      newAskingPrice,
+      oldPredictedValue: existing.predictedValue,
+      newPredictedValue: newValuation.predictedValue,
+      oldPredictedLow: existing.predictedLow,
+      newPredictedLow: newValuation.predictedLow,
+      oldPredictedHigh: existing.predictedHigh,
+      newPredictedHigh: newValuation.predictedHigh,
+    };
+  }
 
   private async requireListing(id: string): Promise<Listing> {
     const listing = await this.prisma.listing.findUnique({ where: { id } });

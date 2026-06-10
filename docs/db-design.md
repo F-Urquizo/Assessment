@@ -1,6 +1,6 @@
 # Database Design
 
-> Migration: `20260609181917_auth_init`
+> Migrations: `20260609181917_auth_init` · `20260610033940_listings_init` · `20260610171233_listing_price_history`
 > ORM: Prisma 6 · Provider: PostgreSQL 16
 
 ---
@@ -66,6 +66,72 @@ Single-use tokens sent by email to confirm account ownership.
 
 ---
 
+### `Listing`
+
+A marketplace vehicle listing. The first 13 columns (`manufacturer`…`state`) are the **exact** feature set the model-service `/predict` endpoint consumes — keeping them 1-to-1 with the model input means valuation-on-write is a straight field map (camelCase → snake_case) with no translation table. The `predicted*` / `dealDeltaPct` columns are **derived** values written by the service, never accepted from the client.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `TEXT` (cuid) | PK |
+| `manufacturer` | `TEXT` | Spec. Free string — model-service maps unknowns to `other` rather than rejecting |
+| `model` | `TEXT` | Spec. Free string (same reason) |
+| `year` | `INTEGER` | Spec. Constrained 1990–2021 at the DTO |
+| `odometer` | `INTEGER` | Spec. Miles |
+| `cylinders` | `INTEGER?` | Spec. Nullable — model-service defaults to the dataset median |
+| `condition` | `TEXT` | Spec. One of a fixed option set (DTO-validated) |
+| `fuel` | `TEXT` | Spec. Fixed option set |
+| `titleStatus` | `TEXT` | Spec. Fixed option set |
+| `transmission` | `TEXT` | Spec. Fixed option set |
+| `drive` | `TEXT` | Spec. Fixed option set |
+| `type` | `TEXT` | Spec. Fixed option set (body style) |
+| `paintColor` | `TEXT` | Spec. Fixed option set |
+| `state` | `TEXT` | Spec. US state code |
+| `askingPrice` | `INTEGER` | Marketplace. Seller's price |
+| `description` | `TEXT?` | Marketplace. Free copy |
+| `contactEmail` | `TEXT` | Marketplace. Buyer contact |
+| `contactPhone` | `TEXT?` | Marketplace. Optional |
+| `status` | `ListingStatus` enum | `draft` \| `active` \| `sold`. Publishing (`active`) requires a verified email |
+| `predictedValue` | `INTEGER?` | **Derived.** Model-service point estimate; null if valuation was unavailable |
+| `predictedLow` | `INTEGER?` | **Derived.** Lower bound of the estimate |
+| `predictedHigh` | `INTEGER?` | **Derived.** Upper bound of the estimate |
+| `dealDeltaPct` | `DOUBLE PRECISION?` | **Derived.** `(askingPrice − predictedValue) / predictedValue × 100`. Negative = below market |
+| `userId` | `TEXT` | FK → `User.id` `ON DELETE CASCADE` (owner) |
+| `createdAt` | `TIMESTAMP` | Immutable audit field |
+| `updatedAt` | `TIMESTAMP` | Auto-maintained by Prisma |
+
+**Why store the derived valuation columns?** They are cached results of an expensive, out-of-band call to the Python model-service. Browse and detail reads must not block on a model round-trip, and the deal badge / `bestDeal` sort need `dealDeltaPct` to be filterable and orderable in SQL. They are a deliberate, controlled denormalization — see the 3NF note below.
+
+**Indexes:** `userId` (owner's listings, cascade), `status` (browse filters to `active`), `manufacturer` (a common browse filter).
+
+---
+
+### `ListingPriceHistory`
+
+Append-only audit trail: one row every time a listing's `askingPrice` **or** its valuation (`predictedValue`, `predictedLow`, or `predictedHigh`) changes — including the initial create. Written **in the same transaction** as the `Listing` write, so a price never exists without the row that explains it.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `TEXT` (cuid) | PK |
+| `listingId` | `TEXT` | FK → `Listing.id` `ON DELETE CASCADE` |
+| `oldAskingPrice` | `INTEGER?` | Null on the initial `created` row |
+| `newAskingPrice` | `INTEGER` | Asking price after the change |
+| `oldPredictedValue` | `INTEGER?` | Point estimate before the change (nullable) |
+| `newPredictedValue` | `INTEGER?` | Point estimate after the change (nullable) |
+| `oldPredictedLow` | `INTEGER?` | Lower valuation bound before the change (nullable) |
+| `newPredictedLow` | `INTEGER?` | Lower valuation bound after the change (nullable) |
+| `oldPredictedHigh` | `INTEGER?` | Upper valuation bound before the change (nullable) |
+| `newPredictedHigh` | `INTEGER?` | Upper valuation bound after the change (nullable) |
+| `reason` | `PriceChangeReason` enum | `created` \| `asking_price_change` \| `revaluation` |
+| `changedAt` | `TIMESTAMP` | When the change was recorded |
+
+**Why append-only?** The trend shown on the listing detail page is the literal sequence of these rows; mutating or deleting them would corrupt the history. The current price always lives on `Listing` — this table is the log of how it got there.
+
+**`reason` semantics:** `created` on insert; `asking_price_change` when only the seller's price moved; `revaluation` when a spec edit changed any valuation field (`predictedValue`, `predictedLow`, or `predictedHigh`). When price and valuation both move in one update, a single `revaluation` row is written (the more informative of the two).
+
+**Indexes:** `listingId` (fetch a listing's trend), `changedAt` (chronological ordering / range scans).
+
+---
+
 ## Design Rationale
 
 ### Token storage: hashes only
@@ -83,14 +149,21 @@ When a `User` row is deleted, all associated `RefreshToken` and `EmailVerificati
 - **No sequence lock** — distributed inserts never contend on a single counter.
 - **URL-safe** — no escaping needed in tokens or route params.
 
-### Third Normal Form (3NF)
+### Normalization (1NF → 3NF)
 
-Every non-key attribute depends on the whole key and nothing but the key:
-- `User`: all fields describe the user, no transitive dependency.
-- `RefreshToken`: `tokenHash`, `familyId`, `expiresAt`, `revokedAt` all directly describe the token row, not the user.
-- `EmailVerificationToken`: same pattern — no derived or repeated data.
+**1NF — atomic columns, no repeating groups.** Every column holds a single scalar. The 13 spec fields are individual columns rather than a serialized blob, so they can be filtered/indexed and fed straight to `/predict`. A listing's price history is *not* a repeating group stuffed into the `Listing` row — it is factored out into its own `ListingPriceHistory` table, one row per change.
 
-No many-to-many join tables needed at this stage; relations are 1:N (User → tokens).
+**2NF — every non-key attribute depends on the whole PK.** All tables use a single-column surrogate PK (`cuid`), so there are no composite keys and therefore no partial-dependency risk: each attribute depends on that one id.
+
+**3NF — no transitive dependencies, with one documented exception.**
+- `User`, `RefreshToken`, `EmailVerificationToken`, `ListingPriceHistory`: every non-key column directly describes its own row, with no derived or transitively-dependent data.
+- `Listing` **intentionally caches derived values** — `predictedValue`, `predictedLow`, `predictedHigh`, and `dealDeltaPct` are functions of the spec fields and `askingPrice`, so in strict 3NF they would be recomputed rather than stored. They are denormalized on purpose because:
+  - the inputs come from an **external service** (the Python valuation model), not from columns in the same row, so this is a cached cross-system result rather than a classic intra-row transitive dependency;
+  - browse/detail reads would otherwise pay a model round-trip on every request, and `dealDeltaPct` must be SQL-filterable/sortable for the deal badge and `bestDeal` ordering.
+
+  **The consistency rule that makes this safe:** these columns are written **only** by `ListingsService`, recomputed on every create and on every price/spec change, and **mirrored into `ListingPriceHistory` in the same transaction**. The client can never set them (the validation pipe whitelists them out and the service overwrites them), so the cache cannot drift from its inputs.
+
+Relations remain 1:N (`User` → listings/tokens, `Listing` → price history); no many-to-many join tables are needed at this stage.
 
 ---
 
@@ -99,10 +172,13 @@ No many-to-many join tables needed at this stage; relations are 1:N (User → to
 ```
 User 1 ──< RefreshToken
 User 1 ──< EmailVerificationToken
+User 1 ──< Listing
+Listing 1 ──< ListingPriceHistory
 ```
 
 ---
 
+*This document will be extended as new tables are added (favorites, search history, etc.).*
 ---
 
 ### `AuditLog` (table: `auth_audit_log`)
