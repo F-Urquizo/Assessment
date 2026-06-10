@@ -1,8 +1,11 @@
 import { Controller, Get, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuditEvent, Prisma, Role } from '@prisma/client';
 import { Roles } from '../auth/guards';
 import { PrismaService } from '../prisma/prisma.service';
 
+@ApiTags('admin')
+@ApiBearerAuth('access-token')
 @Controller('admin')
 @Roles(Role.admin)
 export class AdminController {

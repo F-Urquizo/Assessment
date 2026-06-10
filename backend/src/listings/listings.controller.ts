@@ -11,6 +11,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, Public } from '../auth/guards';
 import type { RequestUser } from '../auth/guards';
 import { CreateListingDto } from './dto/create-listing.dto';
@@ -24,6 +25,8 @@ import { ListingsService } from './listings.service';
  * live in the service so they apply no matter who calls it (incl. Fran's
  * recommendation flow, which uses the service directly).
  */
+@ApiTags('listings')
+@ApiBearerAuth('access-token')
 @Controller('listings')
 @UseGuards(JwtAuthGuard)
 export class ListingsController {
