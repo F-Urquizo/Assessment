@@ -15,7 +15,9 @@ export default function FavoritesView() {
     <>
       <div className="view-head">
         <div className="view-kicker">Favorites · 01</div>
-        <div className="view-title">Saved cars</div>
+        <div className="view-title">
+          Saved cars{favorites.length ? ` · ${favorites.length}` : ''}
+        </div>
         <div className="view-sub">
           Listings you’ve hearted. Open one to see the full valuation breakdown.
         </div>
