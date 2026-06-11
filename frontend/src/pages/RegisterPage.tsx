@@ -23,13 +23,13 @@ export default function RegisterPage() {
     // Mirror backend validation to save a round-trip on obvious errors.
     const clientErrors: string[] = [];
     if (!EMAIL_REGEX.test(email))
-      clientErrors.push('Ingresa un correo electrónico válido.');
+      clientErrors.push('Enter a valid email address.');
     if (password.length < PASSWORD_MIN_LENGTH)
       clientErrors.push(
-        `La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`,
+        `Your password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
       );
     if (password !== confirm)
-      clientErrors.push('Las contraseñas no coinciden.');
+      clientErrors.push('The passwords do not match.');
     if (clientErrors.length) {
       setErrors(clientErrors);
       return;
@@ -41,13 +41,13 @@ export default function RegisterPage() {
       setDone(true);
     } catch (err) {
       if (err instanceof AuthApiError && err.statusCode === 409) {
-        setErrors(['Este correo ya está registrado.']);
+        setErrors(['This email is already registered.']);
       } else if (err instanceof AuthApiError && err.statusCode === 422) {
         setErrors(
           Array.isArray(err.messages) ? err.messages : [err.messages],
         );
       } else {
-        setErrors([err instanceof Error ? err.message : 'Error inesperado.']);
+        setErrors([err instanceof Error ? err.message : 'Unexpected error.']);
       }
     } finally {
       setSubmitting(false);
@@ -59,14 +59,14 @@ export default function RegisterPage() {
       <main className="auth-page">
         <section className="auth-card" aria-labelledby="register-title">
           <h1 id="register-title" className="auth-title">
-            Revisa tu correo
+            Check your email
           </h1>
           <p className="auth-success" role="status">
-            Cuenta creada. Te enviamos un enlace para verificar{' '}
-            <strong>{email}</strong> — ábrelo y después inicia sesión.
+            Account created. We sent a link to verify{' '}
+            <strong>{email}</strong> — open it, then log in.
           </p>
           <p className="auth-alt">
-            ¿Ya verificaste? <Link to="/login">Inicia sesión</Link>
+            Already verified? <Link to="/login">Log in</Link>
           </p>
         </section>
       </main>
@@ -77,16 +77,16 @@ export default function RegisterPage() {
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="register-title">
         <h1 id="register-title" className="auth-title">
-          Crear cuenta
+          Create account
         </h1>
         <p className="auth-note">
-          Guarda favoritos y publica tus vehículos en el marketplace.
+          Save favorites and list your vehicles on the marketplace.
         </p>
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="field">
             <label htmlFor="reg-email">
-              <span className="num">01</span> Correo electrónico
+              <span className="num">01</span> Email address
             </label>
             <input
               id="reg-email"
@@ -101,7 +101,7 @@ export default function RegisterPage() {
 
           <div className="field">
             <label htmlFor="reg-password">
-              <span className="num">02</span> Contraseña
+              <span className="num">02</span> Password
             </label>
             <input
               id="reg-password"
@@ -114,13 +114,13 @@ export default function RegisterPage() {
               aria-describedby="reg-password-hint"
             />
             <p id="reg-password-hint" className="auth-note" style={{ marginTop: 6, marginBottom: 0 }}>
-              Mínimo {PASSWORD_MIN_LENGTH} caracteres.
+              Minimum {PASSWORD_MIN_LENGTH} characters.
             </p>
           </div>
 
           <div className="field">
             <label htmlFor="reg-confirm">
-              <span className="num">03</span> Confirmar contraseña
+              <span className="num">03</span> Confirm password
             </label>
             <input
               id="reg-confirm"
@@ -149,13 +149,13 @@ export default function RegisterPage() {
 
           <div className="actions">
             <button type="submit" className="appraise" disabled={submitting}>
-              {submitting ? 'Creando…' : 'Crear cuenta'}
+              {submitting ? 'Creating…' : 'Create account'}
             </button>
           </div>
         </form>
 
         <p className="auth-alt">
-          ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
+          Already have an account? <Link to="/login">Log in</Link>
         </p>
       </section>
     </main>
