@@ -113,10 +113,10 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               aria-describedby="reg-password-hint"
             />
-            <p id="reg-password-hint" className="auth-note" style={{ marginTop: 6, marginBottom: 0 }}>
-              Minimum {PASSWORD_MIN_LENGTH} characters.
-            </p>
           </div>
+          <p id="reg-password-hint" className="field-hint">
+            Minimum {PASSWORD_MIN_LENGTH} characters.
+          </p>
 
           <div className="field">
             <label htmlFor="reg-confirm">
