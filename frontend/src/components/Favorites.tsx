@@ -6,22 +6,20 @@ export default function Favorites() {
   return (
     <>
       <div className="stripes"></div>
-      <div className="page">
+      <main className="page">
         <header>
-          <div className="masthead-left">
-            <div className="kicker">Your saved cars · Favorites</div>
+          <div className="masthead-kicker">Your saved cars · Favorites</div>
+          <div className="masthead-row">
             <h1>
               BLUEBOOK <em>Saved</em>
             </h1>
-          </div>
-          <div className="masthead-right">
-            Favorites · v1
-            <br />
-            Cars you’ve <strong>hearted</strong>
+            <div className="masthead-right">
+              Cars you’ve <strong>hearted</strong>
+            </div>
           </div>
         </header>
         <FavoritesView />
-      </div>
+      </main>
     </>
   );
 }

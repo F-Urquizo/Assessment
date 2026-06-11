@@ -36,7 +36,9 @@ export default function App() {
     <AuthProvider>
       <FavoritesProvider>
         <MyListingsProvider options={options}>
+          <a href="#main-content" className="skip-link">Skip to main content</a>
           <ModeNav />
+          <main id="main-content">
           <Routes>
             <Route path="/" element={<Marketplace options={options} />} />
             <Route
@@ -52,6 +54,7 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
           </Routes>
+          </main>
         </MyListingsProvider>
       </FavoritesProvider>
     </AuthProvider>

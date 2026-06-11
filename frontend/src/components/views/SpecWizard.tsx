@@ -88,6 +88,7 @@ export default function SpecWizard() {
                 key={opt}
                 type="button"
                 className={'wiz-opt' + (form[current.name] === opt ? ' sel' : '')}
+                aria-pressed={form[current.name] === opt}
                 onClick={() => choose(opt)}
               >
                 {opt}

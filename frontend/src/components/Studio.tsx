@@ -23,8 +23,8 @@ function View({ tab, children }: { tab: TabName; children: ReactNode }) {
 function StudioShell() {
   return (
     <>
-      <div className="stripes"></div>
-      <div className="page">
+      <div className="stripes" aria-hidden="true"></div>
+      <main className="page">
         <Header />
         <Tabs />
         <View tab="appraise">
@@ -49,7 +49,7 @@ function StudioShell() {
           <SellView />
         </View>
         <Footer />
-      </div>
+      </main>
     </>
   );
 }

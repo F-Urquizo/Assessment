@@ -9,23 +9,21 @@ import MarketplaceView from './views/MarketplaceView';
 export default function Marketplace({ options }: { options: Options }) {
   return (
     <>
-      <div className="stripes"></div>
-      <div className="page">
+      <div className="stripes" aria-hidden="true"></div>
+      <main className="page">
         <header>
-          <div className="masthead-left">
-            <div className="kicker">Used-Car Marketplace · Community Listings</div>
+          <div className="masthead-kicker">Used-Car Marketplace · Community Listings</div>
+          <div className="masthead-row">
             <h1>
               BLUEBOOK <em>Market</em>
             </h1>
-          </div>
-          <div className="masthead-right">
-            Marketplace · v1
-            <br />
-            Every car valued by the <strong>model</strong>
+            <div className="masthead-right">
+              Every car valued by the <strong>model</strong>
+            </div>
           </div>
         </header>
         <MarketplaceView options={options} />
-      </div>
+      </main>
     </>
   );
 }
