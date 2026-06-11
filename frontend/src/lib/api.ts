@@ -24,6 +24,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+type RawRecommendedListing = Listing & {
+  score: number;
+  why: string;
+};
+
 function postJson<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {
     method: 'POST',
@@ -62,8 +67,11 @@ export function fetchListings(query: BrowseQuery = {}): Promise<BrowseResult> {
 }
 
 /** GET /recommendations — top-N best-deal active listings with a "why" (public). */
-export function fetchRecommendations(limit = 8): Promise<RecommendedListing[]> {
-  return request<RecommendedListing[]>(`/recommendations?limit=${limit}`);
+export async function fetchRecommendations(limit = 8): Promise<RecommendedListing[]> {
+  const recs = await request<RawRecommendedListing[]>(
+    `/recommendations?limit=${limit}`,
+  );
+  return recs.map(({ score, why, ...listing }) => ({ listing, score, why }));
 }
 
 /** GET /listings/:id — full listing detail incl. price history (public). */

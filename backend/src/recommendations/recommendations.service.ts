@@ -30,6 +30,14 @@ interface PrefProfile {
   priceCenter: number | null;
 }
 
+const EMPTY_PROFILE: PrefProfile = {
+  makes: {},
+  types: {},
+  fuels: {},
+  drives: {},
+  priceCenter: null,
+};
+
 @Injectable()
 export class RecommendationsService {
   constructor(
@@ -39,10 +47,10 @@ export class RecommendationsService {
     private readonly searchHistory: SearchHistoryService,
   ) {}
 
-  async recommend(userId: string, limit: number): Promise<RecommendationItem[]> {
+  async recommend(userId: string | undefined, limit: number): Promise<RecommendationItem[]> {
     const [candidates, profile] = await Promise.all([
       this.listings.findActive({ excludeUserId: userId, take: CANDIDATE_POOL_SIZE }),
-      this.buildProfile(userId),
+      userId ? this.buildProfile(userId) : EMPTY_PROFILE,
     ]);
 
     const isEmpty = this.isEmptyProfile(profile);
