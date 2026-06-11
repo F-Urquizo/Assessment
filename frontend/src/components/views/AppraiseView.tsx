@@ -1,10 +1,10 @@
-import SpecForm from './SpecForm';
+import SpecWizard from './SpecWizard';
 import ValuePlate from './ValuePlate';
 
 export default function AppraiseView() {
   return (
     <div className="layout">
-      <SpecForm />
+      <SpecWizard />
       <ValuePlate />
     </div>
   );

@@ -113,7 +113,13 @@ function MarketplaceBody({
   onOpen: (id: string) => void;
 }) {
   if (state.status === 'loading') {
-    return <div className="mkt-loading">Loading the lot…</div>;
+    return (
+      <div className="listing-grid" aria-busy="true" aria-label="Loading listings">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="listing-card skel-card skeleton" />
+        ))}
+      </div>
+    );
   }
   if (state.status === 'error') {
     return <div className="rec-empty">⚠ {state.message}</div>;

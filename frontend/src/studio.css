@@ -390,3 +390,25 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--ink); 
 .mode-user { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--green); padding: 9px 10px 9px 14px; border-left: 1.5px solid var(--ink); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; }
 .mode-logout { color: var(--amber); }
 .mode-logout:disabled { opacity: .55; cursor: wait; }
+
+/* Appraise wizard (card stepper) */
+.wiz-progress { height: 5px; background: var(--paper-dark); border: 1px solid var(--rule); margin: 6px 0 8px; position: relative; overflow: hidden; }
+.wiz-bar { position: absolute; inset: 0 auto 0 0; background: var(--amber); transition: width .3s ease; }
+.wiz-meta { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgba(32,37,31,.55); margin-bottom: 18px; }
+.wiz-card { padding: 30px 30px 26px; min-height: 220px; }
+.wiz-q { font-family: var(--serif); font-size: 27px; line-height: 1.1; margin-bottom: 22px; }
+.wiz-q .num { font-family: var(--mono); font-size: 13px; color: var(--amber); margin-right: 8px; }
+.wiz-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.wiz-opt { font-family: var(--mono); font-size: 13px; padding: 11px 16px; border: 1.5px solid var(--rule); background: var(--paper); cursor: pointer; color: var(--ink); transition: border-color .15s, color .15s, background .15s; }
+.wiz-opt:hover { border-color: var(--amber); color: var(--amber); }
+.wiz-opt.sel { background: var(--green); border-color: var(--green); color: var(--paper); }
+.wiz-opt:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.wiz-input { width: 100%; background: transparent; border: none; border-bottom: 2px solid var(--ink); font-family: var(--serif); font-size: 32px; color: var(--ink); padding: 4px 0; outline: none; }
+.wiz-input:focus { border-bottom-color: var(--amber); }
+.wiz-actions { margin-top: 28px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.wiz-hint { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: rgba(32,37,31,.5); }
+
+/* Loading skeletons */
+.skeleton { background: linear-gradient(90deg, var(--paper-dark) 25%, rgba(32,37,31,.07) 37%, var(--paper-dark) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; }
+.skel-card { min-height: 178px; border: 1px solid var(--rule); }
+@keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
