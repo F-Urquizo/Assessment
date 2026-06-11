@@ -7,6 +7,7 @@ import ModeNav from './components/ModeNav';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import { AuthProvider } from './context/auth-provider';
 import { FavoritesProvider } from './context/FavoritesProvider';
 import { MyListingsProvider } from './context/MyListingsProvider';
@@ -49,7 +50,7 @@ export default function App() {
             <Route path="/studio" element={<Studio options={options} />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            {/* /verify-email lands in the next step. */}
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
           </Routes>
         </MyListingsProvider>
       </FavoritesProvider>
