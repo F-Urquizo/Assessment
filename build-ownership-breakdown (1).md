@@ -8,16 +8,16 @@ The full build is broken into five ownership areas — one per person. Each owns
 
 Every item below is a graded requirement. This table maps each one to its owner(s) and where it's satisfied — check it against the slide before submission.
 
-| # | Requirement (rubric) | Owner(s) | Where it's covered |
-|---|----------------------|----------|--------------------|
-| 1 | Autenticación | Beto + Ramiro | AuthModule (register/login/verify/logout) + auth UI |
-| 2 | Base de datos | Beto + Paúl + Fran | ORM + migrations; `users`, `listings`, `favorites`, history tables |
-| 3 | Seguridad, certificados, tokens, encripción | Beto | argon2id, JWT, httpOnly cookies, HTTPS/TLS, encryption at rest |
-| 4 | Históricos | Paúl + Fran + Beto | `listing_price_history`, `search_history`, `auth_audit_log` |
-| 5 | Manejo de sesiones | Beto + Ramiro | Refresh rotation/revoke + silent-refresh interceptor |
-| 6 | UIUX, accesibilidad, usabilidad | Ramiro + Andrés | Semantic HTML, ARIA, keyboard nav, contrast, focus mgmt |
-| 7 | Formas normales de base de datos | Beto (lead) + schema owners | DB design doc — normalization to 3NF with justification |
-| 8 | Diseño de base de datos y justificación | Beto (lead) + schema owners | ER diagram + design-rationale doc |
+| #   | Requirement (rubric)                        | Owner(s)                    | Where it's covered                                                 |
+| --- | ------------------------------------------- | --------------------------- | ------------------------------------------------------------------ |
+| 1   | Autenticación                               | Beto + Ramiro               | AuthModule (register/login/verify/logout) + auth UI                |
+| 2   | Base de datos                               | Beto + Paúl + Fran          | ORM + migrations; `users`, `listings`, `favorites`, history tables |
+| 3   | Seguridad, certificados, tokens, encripción | Beto                        | argon2id, JWT, httpOnly cookies, HTTPS/TLS, encryption at rest     |
+| 4   | Históricos                                  | Paúl + Fran + Beto          | `listing_price_history`, `search_history`, `auth_audit_log`        |
+| 5   | Manejo de sesiones                          | Beto + Ramiro               | Refresh rotation/revoke + silent-refresh interceptor               |
+| 6   | UIUX, accesibilidad, usabilidad             | Ramiro + Andrés             | Semantic HTML, ARIA, keyboard nav, contrast, focus mgmt            |
+| 7   | Formas normales de base de datos            | Beto (lead) + schema owners | DB design doc — normalization to 3NF with justification            |
+| 8   | Diseño de base de datos y justificación     | Beto (lead) + schema owners | ER diagram + design-rationale doc                                  |
 
 ---
 
@@ -57,14 +57,14 @@ Every item below is a graded requirement. This table maps each one to its owner(
 
 **Depends on listings & favorites tables.**
 
-- [ ] Schema + migration for `favorites`; FavoritesModule (add/remove/list)
-- [ ] **Históricos (rubric #4):** persist `search_history` (filters + timestamp per user); reuse it as the recency signal for recommendations
-- [ ] Preference-profile builder from favorites + `search_history` (make, body, year proximity, price band, drivetrain/fuel)
-- [ ] RecommendationsModule: deal_score, preference_score, combined = 0.5·deal + 0.5·pref, cold-start → deal only
-- [ ] GET `/recommendations`: top-N active listings, exclude own, attach "why" string
-- [ ] model-service: add a batch valuation endpoint if per-listing `/predict` proves chatty; otherwise confirm existing endpoints suffice
-- [ ] Contribute `favorites` + `search_history` design + normalization notes to Beto's DB design doc **(rubric #7, #8)**
-- [ ] Unit tests: scoring on fixtures (deterministic), cold-start path, "why" strings
+- ✅ Schema + migration for `favorites`; FavoritesModule (add/remove/list)
+- ✅ **Históricos (rubric #4):** persist `search_history` (filters + timestamp per user); reuse it as the recency signal for recommendations
+- ✅ Preference-profile builder from favorites + `search_history` (make, body, year proximity, price band, drivetrain/fuel)
+- ✅ RecommendationsModule: deal_score, preference_score, combined = 0.5·deal + 0.5·pref, cold-start → deal only
+- ✅ GET `/recommendations`: top-N active listings, exclude own, attach "why" string
+- ✅ model-service: add a batch valuation endpoint if per-listing `/predict` proves chatty; otherwise confirm existing endpoints suffice
+- ✅ Contribute `favorites` + `search_history` design + normalization notes to Beto's DB design doc **(rubric #7, #8)**
+- ✅ Unit tests: scoring on fixtures (deterministic), cold-start path, "why" strings
 
 ## 🔐 Ramiro — Frontend: Auth, sessions & app shell
 
@@ -105,6 +105,7 @@ Every item below is a graded requirement. This table maps each one to its owner(
 Not required by the rubric. Ordered so you can grab the cheap wins first and stop wherever time runs out. Complexity = rough effort/risk, not value.
 
 ### 🟢 Low complexity — cheap polish, grab these first
+
 - [ ] **Dark/light theme toggle** — mostly CSS variables; low risk, good demo value.
 - [ ] **Empty/loading/error states** across views — skeleton loaders, "no results" messaging. Improves the usabilidad story (#6) for almost no architectural cost.
 - [ ] **Saved-search shortcuts** — let a user re-apply a past `search_history` entry with one click (data already exists).
@@ -112,6 +113,7 @@ Not required by the rubric. Ordered so you can grab the cheap wins first and sto
 - [ ] **Basic admin dashboard counts** — total users / listings / favorites (simple aggregate queries).
 
 ### 🟡 Medium complexity — solid additions if time allows
+
 - [ ] **Password reset flow** — reuses the email/token infrastructure from verification; new endpoints + UI.
 - [ ] **Image upload to storage** (replacing the single image-URL field) — needs storage (S3/local) + validation; touches both back and front.
 - [ ] **Pagination + infinite scroll** on the marketplace beyond basic page params.
@@ -120,6 +122,7 @@ Not required by the rubric. Ordered so you can grab the cheap wins first and sto
 - [ ] **Saved/compare listings** — side-by-side spec + valuation comparison.
 
 ### 🔴 High complexity — only with real time buffer
+
 - [ ] **In-app messaging** between buyer and seller (was explicitly out of scope for v1 — non-trivial: threads, read state, sockets).
 - [ ] **Offers/negotiation flow** — state machine, notifications, authorization edges.
 - [ ] **Real-time recommendation re-ranking** as the user browses (websocket + online scoring).

@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import { ListingsController } from './listings.controller';
 import { ListingsService } from './listings.service';
+import { SearchHistoryService } from './search-history.service';
 import type { RequestUser } from '../auth/jwt.strategy';
 
 const user: RequestUser = {
@@ -30,7 +31,10 @@ describe('ListingsController', () => {
   beforeEach(async () => {
     const module = await Test.createTestingModule({
       controllers: [ListingsController],
-      providers: [{ provide: ListingsService, useValue: serviceMock }],
+      providers: [
+        { provide: ListingsService, useValue: serviceMock },
+        { provide: SearchHistoryService, useValue: { record: jest.fn() } },
+      ],
     }).compile();
 
     controller = module.get(ListingsController);
@@ -45,7 +49,8 @@ describe('ListingsController', () => {
 
   it('findAll() passes the browse query through to the service', async () => {
     const query = { make: 'toyota', sort: 'bestDeal', page: 2 } as never;
-    const result = await controller.findAll(query);
+    // req has no user → search history is not recorded; browsing still works.
+    const result = await controller.findAll(query, {} as any);
     expect(serviceMock.browse).toHaveBeenCalledWith(query);
     expect(result).toEqual({
       items: [{ id: 'listing_1' }],
