@@ -4,6 +4,7 @@ import Studio from './components/Studio';
 import Marketplace from './components/Marketplace';
 import Favorites from './components/Favorites';
 import ModeNav from './components/ModeNav';
+import ThemeToggle from './components/ThemeToggle';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -37,6 +38,7 @@ export default function App() {
       <FavoritesProvider>
         <MyListingsProvider options={options}>
           <ModeNav />
+          <ThemeToggle />
           <Routes>
             <Route path="/" element={<Marketplace options={options} />} />
             <Route
@@ -47,7 +49,14 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/studio" element={<Studio options={options} />} />
+            <Route
+              path="/studio"
+              element={
+                <ProtectedRoute>
+                  <Studio options={options} />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
