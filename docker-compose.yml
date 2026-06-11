@@ -26,8 +26,10 @@ services:
       # Postgres via the Docker network hostname, not localhost.
       DATABASE_URL: "postgresql://${POSTGRES_USER:-appuser}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-appraisal}?schema=public"
       MODEL_SERVICE_URL: "http://model-service:5050"
+      # Keep the container listener aligned with the published container port.
+      PORT: "3000"
     ports:
-      - "${PORT:-3000}:3000"
+      - "${BACKEND_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy
