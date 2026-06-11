@@ -4,6 +4,7 @@ import Studio from './components/Studio';
 import Marketplace from './components/Marketplace';
 import Favorites from './components/Favorites';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import { AuthProvider } from './context/auth-provider';
 import { FavoritesProvider } from './context/FavoritesProvider';
 import { MyListingsProvider } from './context/MyListingsProvider';
@@ -55,7 +56,8 @@ export default function App() {
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/studio" element={<Studio options={options} />} />
             <Route path="/login" element={<LoginPage />} />
-            {/* Auth routes (/register, /verify-email) land in later steps. */}
+            <Route path="/register" element={<RegisterPage />} />
+            {/* /verify-email lands in the next step. */}
           </Routes>
         </MyListingsProvider>
       </FavoritesProvider>
