@@ -9,14 +9,17 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { CurrentUser, JwtAuthGuard, Public } from '../auth/guards';
 import type { RequestUser } from '../auth/guards';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { BrowseListingsDto } from './dto/browse-listings.dto';
 import { ListingsService } from './listings.service';
+import { SearchHistoryService } from './search-history.service';
 
 /**
  * Marketplace listing routes. Browsing is public; every mutation requires a
@@ -27,7 +30,10 @@ import { ListingsService } from './listings.service';
 @Controller('listings')
 @UseGuards(JwtAuthGuard)
 export class ListingsController {
-  constructor(private readonly listings: ListingsService) {}
+  constructor(
+    private readonly listings: ListingsService,
+    private readonly searchHistory: SearchHistoryService,
+  ) {}
 
   @Post()
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateListingDto) {
@@ -36,7 +42,13 @@ export class ListingsController {
 
   @Public()
   @Get()
-  findAll(@Query() query: BrowseListingsDto) {
+  findAll(
+    @Query() query: BrowseListingsDto,
+    @Req() req: Request & { user?: RequestUser },
+  ) {
+    if (req.user) {
+      void this.searchHistory.record(req.user.id, query).catch(() => undefined);
+    }
     return this.listings.browse(query);
   }
 

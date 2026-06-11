@@ -6,11 +6,13 @@ import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { CryptoModule } from './crypto/crypto.module';
+import { FavoritesModule } from './favorites/favorites.module';
 import { ListingsModule } from './listings/listings.module';
 import { JwtAuthGuard, RolesGuard, VerifiedGuard } from './auth/guards';
 import { ModelController } from './model/model.controller';
 import { ModelService } from './model/model.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { RecommendationsModule } from './recommendations/recommendations.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -25,6 +27,8 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     AdminModule,
     ListingsModule,
+    FavoritesModule,
+    RecommendationsModule,
   ],
   controllers: [ModelController],
   providers: [

@@ -51,7 +51,9 @@ model User {
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   auditLogs               AuditLog[]
-  listings               Listing[]
+  listings                Listing[]
+  favorites               Favorite[]
+  searchHistory           SearchHistory[]
 
   @@index([email])
 }
@@ -103,6 +105,7 @@ model Listing {
   updatedAt DateTime @updatedAt
 
   priceHistory ListingPriceHistory[]
+  favorites    Favorite[]
 
   @@index([userId])
   @@index([status])
@@ -115,6 +118,43 @@ model Listing {
 // valuation (predictedValue/Low/High) changes — including the initial create. Written
 // transactionally alongside the Listing so a price and its audit row never
 // drift apart.
+
+// Favorite
+//
+// A user's saved listing. The unique constraint prevents double-saving.
+// Both cascades ensure rows are cleaned up automatically when either side
+// is deleted — no explicit cleanup needed in application code.
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+}
+
+// SearchHistory
+//
+// One row per browse call made by an authenticated user. userId is nullable
+// (SetNull on user delete) so the row survives account deletion while still
+// preserving the aggregate signal. Guest browse calls are not recorded —
+// collecting anonymous data has no recommendation value and adds privacy risk.
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String?
+  filters   Json
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
 
 model ListingPriceHistory {
   id        String  @id @default(cuid())

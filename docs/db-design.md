@@ -1,6 +1,6 @@
 # Database Design
 
-> Migrations: `20260609181917_auth_init` · `20260610033940_listings_init` · `20260610171233_listing_price_history`
+> Migrations: `20260609181917_auth_init` · `20260610033940_listings_init` · `20260610171233_listing_price_history` · `20260610200000_add_favorites_search_history`
 > ORM: Prisma 6 · Provider: PostgreSQL 16
 
 ---
@@ -156,29 +156,15 @@ When a `User` row is deleted, all associated `RefreshToken` and `EmailVerificati
 **2NF — every non-key attribute depends on the whole PK.** All tables use a single-column surrogate PK (`cuid`), so there are no composite keys and therefore no partial-dependency risk: each attribute depends on that one id.
 
 **3NF — no transitive dependencies, with one documented exception.**
-- `User`, `RefreshToken`, `EmailVerificationToken`, `ListingPriceHistory`: every non-key column directly describes its own row, with no derived or transitively-dependent data.
+- `User`, `RefreshToken`, `EmailVerificationToken`, `ListingPriceHistory`, `AuditLog`, `Favorite`, `SearchHistory`: every non-key column directly describes its own row, with no derived or transitively-dependent data.
 - `Listing` **intentionally caches derived values** — `predictedValue`, `predictedLow`, `predictedHigh`, and `dealDeltaPct` are functions of the spec fields and `askingPrice`, so in strict 3NF they would be recomputed rather than stored. They are denormalized on purpose because:
   - the inputs come from an **external service** (the Python valuation model), not from columns in the same row, so this is a cached cross-system result rather than a classic intra-row transitive dependency;
   - browse/detail reads would otherwise pay a model round-trip on every request, and `dealDeltaPct` must be SQL-filterable/sortable for the deal badge and `bestDeal` ordering.
 
   **The consistency rule that makes this safe:** these columns are written **only** by `ListingsService`, recomputed on every create and on every price/spec change, and **mirrored into `ListingPriceHistory` in the same transaction**. The client can never set them (the validation pipe whitelists them out and the service overwrites them), so the cache cannot drift from its inputs.
 
-Relations remain 1:N (`User` → listings/tokens, `Listing` → price history); no many-to-many join tables are needed at this stage.
+Relations are 1:N or M:N-via-join. `Favorite` is the explicit join table for the `User ↔ Listing` many-to-many — normalized rather than stored as an array on either side, so each user–listing pair is a first-class row with its own `createdAt` and can be queried, indexed, and cascade-deleted cleanly. `SearchHistory` is a 1:N from `User` (nullable) and stores preference signal as JSONB rather than individual filter columns, which keeps the schema stable as filter options evolve.
 
----
-
-## Entity Relationship
-
-```
-User 1 ──< RefreshToken
-User 1 ──< EmailVerificationToken
-User 1 ──< Listing
-Listing 1 ──< ListingPriceHistory
-```
-
----
-
-*This document will be extended as new tables are added (favorites, search history, etc.).*
 ---
 
 ### `AuditLog` (table: `auth_audit_log`)
@@ -207,14 +193,59 @@ Append-only event store for authentication and authorization events. Designed fo
 
 ---
 
+### `Favorite`
+
+Links a user to a listing they have saved. The composite unique constraint enforces at the database level that a user cannot favorite the same listing twice.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `TEXT` (cuid) | PK |
+| `userId` | `TEXT` | FK → `User.id` `ON DELETE CASCADE` |
+| `listingId` | `TEXT` | FK → `Listing.id` `ON DELETE CASCADE` |
+| `createdAt` | `TIMESTAMP` | Immutable — when the favorite was saved |
+
+**Why both cascades?** A favorite has no meaning if either its owner or the listing it references is deleted. Both `ON DELETE CASCADE` constraints ensure orphan rows are never left behind without application-layer cleanup.
+
+**Why a DB unique constraint instead of an application-layer check?** The constraint is the only race-safe guard. A unique-violation error (Prisma `P2002`) is caught by the service and translated to a `409 Conflict` response — no time-of-check/time-of-use window exists.
+
+**3NF note:** Every column depends solely on `id`. The relationship between a user and a listing is the fact being recorded; `createdAt` is a property of that fact. No column is derivable from any other non-key column.
+
+**Indexes:** `userId` (list a user's favorites); composite unique `(userId, listingId)` (doubles as the lookup index for add/remove point operations).
+
+---
+
+### `SearchHistory`
+
+Records the filter parameters applied during a browse session. Used exclusively as a preference signal for the recommendations engine — only authenticated users' searches are recorded (fire-and-forget inside `ListingsController.browse()`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `TEXT` (cuid) | PK |
+| `userId` | `TEXT?` | Nullable FK → `User.id` `ON DELETE SET NULL` |
+| `filters` | `JSONB` | Non-null fields from `BrowseListingsDto` at search time (make, type, state, price band, sort) |
+| `createdAt` | `TIMESTAMP` | Immutable — when the search was executed |
+
+**Why nullable `userId`?** The schema allows for future anonymous tracking while current application logic only writes rows for authenticated users. A null `userId` means either the user's account was subsequently deleted (SET NULL preserved the row) or the request had no valid JWT.
+
+**Why `ON DELETE SET NULL` (not Cascade)?** A search history entry retains analytical value even after the account is removed — it is a behavioral record, not a user-owned asset. `SET NULL` preserves the row while severing the FK reference, consistent with the pattern established by `AuditLog.userId`.
+
+**Why JSONB for `filters`?** Different searches activate different subsets of available filters. JSONB avoids a wide sparse-column table and lets the recommendations service extract only the keys it cares about (`make`, `type`) without schema changes as filter options evolve.
+
+**3NF note:** `userId` and `filters` are independent facts about the search event; neither is derivable from the other or from `createdAt`. No transitive dependencies exist.
+
+**Indexes:** composite `(userId, createdAt)` — the only read pattern is "last N days of searches for user X", which this index serves directly as a range scan on the leading columns.
+
+---
+
 ## Entity Relationship
 
 ```
 User 1 ──< RefreshToken
 User 1 ──< EmailVerificationToken
-User 1 ──< AuditLog   (userId nullable; row survives user deletion)
+User 1 ──< AuditLog        (userId nullable; row survives user deletion)
+User 1 ──< Listing
+User 1 ──< Favorite
+User 1 ──< SearchHistory   (userId nullable; row survives user deletion)
+Listing 1 ──< ListingPriceHistory
+Listing 1 ──< Favorite
 ```
-
----
-
-*This document will be extended as new tables are added (saved appraisals, etc.).*
