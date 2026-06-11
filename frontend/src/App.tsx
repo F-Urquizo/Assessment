@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import Studio from './components/Studio';
 import Marketplace from './components/Marketplace';
 import Favorites from './components/Favorites';
+import ModeNav from './components/ModeNav';
+import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import { AuthProvider } from './context/auth-provider';
@@ -11,12 +13,6 @@ import { MyListingsProvider } from './context/MyListingsProvider';
 import { fetchOptions } from './lib/api';
 import { MOCK_OPTIONS } from './lib/marketplace-mock';
 import type { Options } from './types';
-
-const TABS: ReadonlyArray<{ to: string; label: string }> = [
-  { to: '/', label: 'Marketplace' },
-  { to: '/favorites', label: 'Favorites' },
-  { to: '/studio', label: 'Studio' },
-];
 
 export default function App() {
   const [options, setOptions] = useState<Options | null>(null);
@@ -39,21 +35,17 @@ export default function App() {
     <AuthProvider>
       <FavoritesProvider>
         <MyListingsProvider options={options}>
-          <nav className="mode-nav" aria-label="App section">
-            {TABS.map((t) => (
-              <NavLink
-                key={t.to}
-                to={t.to}
-                end={t.to === '/'}
-                className={({ isActive }) => 'mode-tab' + (isActive ? ' active' : '')}
-              >
-                {t.label}
-              </NavLink>
-            ))}
-          </nav>
+          <ModeNav />
           <Routes>
             <Route path="/" element={<Marketplace options={options} />} />
-            <Route path="/favorites" element={<Favorites />} />
+            <Route
+              path="/favorites"
+              element={
+                <ProtectedRoute>
+                  <Favorites />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/studio" element={<Studio options={options} />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />

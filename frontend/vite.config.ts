@@ -12,7 +12,17 @@ export default defineConfig({
   server: {
     proxy: Object.fromEntries(
       ['/analyze', '/compare', '/predict', '/api', '/options', '/health', '/listings', '/recommendations', '/favorites', '/auth'].map(
-        (p) => [p, { target: API_TARGET, changeOrigin: true }],
+        (p) => [
+          p,
+          {
+            target: API_TARGET,
+            changeOrigin: true,
+            // Browser navigations (Accept: text/html) to SPA routes that share
+            // a path with the API (/favorites) must load the app, not the API.
+            bypass: (req: { headers: { accept?: string } }) =>
+              req.headers.accept?.includes('text/html') ? '/index.html' : null,
+          },
+        ],
       ),
     ),
   },
