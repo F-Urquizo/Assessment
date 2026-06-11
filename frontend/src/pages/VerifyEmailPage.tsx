@@ -36,22 +36,22 @@ export default function VerifyEmailPage() {
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="verify-title">
         <h1 id="verify-title" className="auth-title">
-          Verificación de correo
+          Email verification
         </h1>
 
         {status === 'verifying' && (
           <p className="auth-note" role="status">
-            Verificando tu correo…
+            Verifying your email…
           </p>
         )}
 
         {status === 'success' && (
           <>
             <p className="auth-success" role="status">
-              ¡Correo verificado! Tu cuenta está activa.
+              Email verified! Your account is active.
             </p>
             <p className="auth-alt">
-              <Link to="/login">Inicia sesión</Link> para continuar.
+              <Link to="/login">Log in</Link> to continue.
             </p>
           </>
         )}
@@ -59,12 +59,12 @@ export default function VerifyEmailPage() {
         {status === 'expired' && (
           <>
             <p className="auth-error" role="alert">
-              Este enlace ya expiró o ya fue utilizado.
+              This link has expired or has already been used.
             </p>
             <p className="auth-alt">
-              Si tu cuenta aún no está verificada, regístrate de nuevo o
-              contacta al administrador para recibir un nuevo enlace.{' '}
-              <Link to="/login">Volver al login</Link>
+              If your account is not yet verified, sign up again or
+              contact the administrator to receive a new link.{' '}
+              <Link to="/login">Back to login</Link>
             </p>
           </>
         )}
@@ -72,11 +72,11 @@ export default function VerifyEmailPage() {
         {status === 'invalid' && (
           <>
             <p className="auth-error" role="alert">
-              El enlace de verificación no es válido.
+              The verification link is not valid.
             </p>
             <p className="auth-alt">
-              Revisa que hayas copiado la URL completa del correo.{' '}
-              <Link to="/login">Volver al login</Link>
+              Make sure you copied the full URL from the email.{' '}
+              <Link to="/login">Back to login</Link>
             </p>
           </>
         )}

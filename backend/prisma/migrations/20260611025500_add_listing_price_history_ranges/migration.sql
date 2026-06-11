@@ -1,0 +1,5 @@
+ALTER TABLE "ListingPriceHistory"
+  ADD COLUMN IF NOT EXISTS "oldPredictedLow" INTEGER,
+  ADD COLUMN IF NOT EXISTS "newPredictedLow" INTEGER,
+  ADD COLUMN IF NOT EXISTS "oldPredictedHigh" INTEGER,
+  ADD COLUMN IF NOT EXISTS "newPredictedHigh" INTEGER;

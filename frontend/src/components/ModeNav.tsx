@@ -46,7 +46,7 @@ export default function ModeNav() {
       {!loading &&
         (isAuthenticated ? (
           <>
-            <span className="mode-user" aria-label={`Sesión: ${user?.email}`}>
+            <span className="mode-user" aria-label={`Session: ${user?.email}`}>
               {user?.email}
             </span>
             <button
@@ -55,7 +55,7 @@ export default function ModeNav() {
               onClick={handleLogout}
               disabled={signingOut}
             >
-              {signingOut ? 'Saliendo…' : 'Salir'}
+              {signingOut ? 'Logging out…' : 'Log out'}
             </button>
           </>
         ) : (
@@ -63,7 +63,7 @@ export default function ModeNav() {
             to="/login"
             className={({ isActive }) => 'mode-tab' + (isActive ? ' active' : '')}
           >
-            Entrar
+            Log in
           </NavLink>
         ))}
     </nav>

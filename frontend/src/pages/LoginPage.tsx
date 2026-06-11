@@ -28,11 +28,11 @@ export default function LoginPage() {
 
     // Mirror backend validation to save a round-trip on obvious errors.
     if (!EMAIL_REGEX.test(email)) {
-      setError('Ingresa un correo electrónico válido.');
+      setError('Enter a valid email address.');
       return;
     }
     if (password.length < PASSWORD_MIN_LENGTH) {
-      setError(`La contraseña debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`);
+      setError(`Your password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
       return;
     }
 
@@ -42,11 +42,11 @@ export default function LoginPage() {
       navigate(from, { replace: true });
     } catch (err) {
       if (err instanceof AuthApiError && err.statusCode === 401) {
-        setError('Correo o contraseña incorrectos.');
+        setError('Incorrect email or password.');
       } else if (err instanceof AuthApiError && err.statusCode === 403) {
-        setError('Tu correo no está verificado. Revisa tu bandeja de entrada.');
+        setError('Your email is not verified. Check your inbox.');
       } else {
-        setError(err instanceof Error ? err.message : 'Error inesperado.');
+        setError(err instanceof Error ? err.message : 'Unexpected error.');
       }
     } finally {
       setSubmitting(false);
@@ -62,14 +62,14 @@ export default function LoginPage() {
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="login-title">
         <h1 id="login-title" className="auth-title">
-          Iniciar sesión
+          Log in
         </h1>
-        <p className="auth-note">Accede a tus favoritos y publica vehículos.</p>
+        <p className="auth-note">Access your favorites and list vehicles.</p>
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="field">
             <label htmlFor="login-email">
-              <span className="num">01</span> Correo electrónico
+              <span className="num">01</span> Email address
             </label>
             <input
               id="login-email"
@@ -84,7 +84,7 @@ export default function LoginPage() {
 
           <div className="field">
             <label htmlFor="login-password">
-              <span className="num">02</span> Contraseña
+              <span className="num">02</span> Password
             </label>
             <input
               id="login-password"
@@ -111,13 +111,13 @@ export default function LoginPage() {
 
           <div className="actions">
             <button type="submit" className="appraise" disabled={submitting}>
-              {submitting ? 'Entrando…' : 'Entrar'}
+              {submitting ? 'Logging in…' : 'Log in'}
             </button>
           </div>
         </form>
 
         <p className="auth-alt">
-          ¿No tienes cuenta? <Link to="/register">Regístrate</Link>
+          Don&apos;t have an account? <Link to="/register">Sign up</Link>
         </p>
       </section>
     </main>

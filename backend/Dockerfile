@@ -1,6 +1,7 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
+COPY prisma ./prisma
 # npm install (not ci) so a stale lock file doesn't block the build while
 # new deps (prisma) are being added. Re-lock locally with `npm install`.
 RUN npm install

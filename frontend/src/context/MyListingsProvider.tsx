@@ -133,7 +133,9 @@ export function MyListingsProvider({
         description: '',
         contactEmail: email,
         contactPhone: '',
-        status: 'active',
+        // Land on draft so the seller reviews price/contact and explicitly
+        // publishes — never push a garage car live without their say-so.
+        status: 'draft',
       });
       setEditingId(null);
       setValuation({
@@ -213,6 +215,12 @@ export function MyListingsProvider({
   }, [form]);
 
   const save = useCallback((): { ok: boolean; error?: string } => {
+    // The backend rejects an unauthenticated POST with 401; without this guard
+    // the optimistic insert below would fake a success the server never granted.
+    if (!isAuthenticated || !accessToken) {
+      return { ok: false, error: 'Log in to list a car.' };
+    }
+
     const built = buildInput();
     if (!built.ok) return built;
     const input = built.input;
@@ -287,7 +295,7 @@ export function MyListingsProvider({
     }
     startNew();
     return { ok: true };
-  }, [buildInput, valuation, editingId, accessToken, user, startNew]);
+  }, [buildInput, valuation, editingId, isAuthenticated, accessToken, user, startNew]);
 
   const remove = useCallback(
     (id: string) => {

@@ -1,3 +1,5 @@
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { useMyListings } from '../../context/MyListingsContext';
 import type { Listing, ListingStatus } from '../../lib/marketplace-types';
 import { DEAL_BADGE_META } from '../../lib/marketplace-types';
@@ -6,19 +8,50 @@ import SellForm from './SellForm';
 
 const STATUSES: ListingStatus[] = ['draft', 'active', 'sold'];
 
+function SellHead() {
+  return (
+    <div className="view-head">
+      <div className="view-kicker">Workspace · 07</div>
+      <div className="view-title">Sell a car</div>
+      <div className="view-sub">
+        List a car for sale and manage your listings. Tip: from the Garage, press
+        “List this car →” on any saved car to prefill this form.
+      </div>
+    </div>
+  );
+}
+
 export default function SellView() {
+  const { isAuthenticated, loading } = useAuth();
   const { myListings, startEdit, remove, setStatus } = useMyListings();
+
+  // Silent refresh still in flight — render nothing rather than flashing the
+  // logged-out prompt at a user whose session is about to be restored.
+  if (loading) return <SellHead />;
+
+  // Listing is an account action — the backend rejects an unauthenticated POST
+  // with 401. Gate the form here so logged-out users see why, not a dead form
+  // that silently fails on submit.
+  if (!isAuthenticated) {
+    return (
+      <>
+        <SellHead />
+        <div className="garage-empty" style={{ marginTop: 28 }}>
+          <div className="big">Log in to list a car</div>
+          Selling needs an account so buyers can reach you and your listings stay
+          tied to you.
+          <br />
+          <NavLink to="/login" className="appraise" style={{ marginTop: 18, display: 'inline-block' }}>
+            Log in →
+          </NavLink>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
-      <div className="view-head">
-        <div className="view-kicker">Workspace · 07</div>
-        <div className="view-title">Sell a car</div>
-        <div className="view-sub">
-          List a car for sale and manage your listings. Tip: from the Garage, press
-          “List this car →” on any saved car to prefill this form.
-        </div>
-      </div>
+      <SellHead />
 
       <SellForm />
 
