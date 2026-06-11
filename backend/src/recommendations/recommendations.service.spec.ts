@@ -1,100 +1,241 @@
-import { ListingsService, ListingView } from '../listings/listings.service';
-import {
-  RecommendationsService,
-  buildWhy,
-  dealScore,
-} from './recommendations.service';
+import { Test } from '@nestjs/testing';
+import { ListingStatus } from '@prisma/client';
+import { RecommendationsService } from './recommendations.service';
+import { ListingsService } from '../listings/listings.service';
+import { FavoritesService } from '../favorites/favorites.service';
+import { SearchHistoryService } from '../listings/search-history.service';
+import { PrismaService } from '../prisma/prisma.service';
 
-// Minimal ListingView factory — only the fields the recommender reads matter;
-// the rest are filled with plausible defaults.
-function view(over: Partial<ListingView>): ListingView {
+// Fixtures
+
+const userId = 'user_1';
+
+function makeListing(
+  overrides: Partial<{
+    id: string;
+    manufacturer: string;
+    type: string;
+    fuel: string;
+    drive: string;
+    askingPrice: number;
+    dealDeltaPct: number | null;
+  }> = {},
+) {
   return {
-    id: 'x',
-    manufacturer: 'toyota',
+    id: overrides.id ?? 'listing_1',
+    manufacturer: overrides.manufacturer ?? 'toyota',
     model: 'camry',
-    year: 2020,
+    year: 2018,
     odometer: 40000,
     cylinders: 4,
     condition: 'good',
-    fuel: 'gas',
+    fuel: overrides.fuel ?? 'gas',
     titleStatus: 'clean',
     transmission: 'automatic',
-    drive: 'fwd',
-    type: 'sedan',
+    drive: overrides.drive ?? 'fwd',
+    type: overrides.type ?? 'sedan',
     paintColor: 'white',
     state: 'ca',
-    askingPrice: 20000,
+    askingPrice: overrides.askingPrice ?? 18000,
     description: null,
-    contactEmail: 'a@b.c',
+    contactEmail: 'seller@example.com',
     contactPhone: null,
-    status: 'active',
-    predictedValue: 21000,
-    predictedLow: 19000,
+    status: ListingStatus.active,
+    predictedValue: 20000,
+    predictedLow: 17000,
     predictedHigh: 23000,
-    dealDeltaPct: 0,
-    dealBadge: 'fair',
-    userId: 'u1',
+    dealDeltaPct: overrides.dealDeltaPct !== undefined ? overrides.dealDeltaPct : -10,
+    userId: 'owner_1',
     createdAt: new Date(),
     updatedAt: new Date(),
-    ...over,
-  } as ListingView;
+    dealBadge: 'under' as const,
+  };
 }
 
-function serviceWith(listings: ListingView[]): RecommendationsService {
-  const stub = { findActive: jest.fn().mockResolvedValue(listings) };
-  return new RecommendationsService(stub as unknown as ListingsService);
-}
+// Mocks
 
-describe('RecommendationsService.topPicks', () => {
-  it('ranks the most under-priced listing first', async () => {
-    const svc = serviceWith([
-      view({ id: 'over', dealDeltaPct: 12 }),
-      view({ id: 'under', dealDeltaPct: -15 }),
-      view({ id: 'fair', dealDeltaPct: 2 }),
-    ]);
-    const recs = await svc.topPicks();
-    expect(recs.map((r) => r.listing.id)).toEqual(['under', 'fair', 'over']);
+const prismaMock = {
+  favorite: { findMany: jest.fn() },
+};
+const listingsMock = { findActive: jest.fn() };
+const favoritesMock = { listingIds: jest.fn() };
+const searchHistoryMock = { recent: jest.fn() };
+
+// Tests
+
+describe('RecommendationsService', () => {
+  let service: RecommendationsService;
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    const module = await Test.createTestingModule({
+      providers: [
+        RecommendationsService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: ListingsService, useValue: listingsMock },
+        { provide: FavoritesService, useValue: favoritesMock },
+        { provide: SearchHistoryService, useValue: searchHistoryMock },
+      ],
+    }).compile();
+    service = module.get(RecommendationsService);
   });
 
-  it('excludes unvalued listings (no dealDeltaPct)', async () => {
-    const svc = serviceWith([
-      view({ id: 'valued', dealDeltaPct: -5 }),
-      view({ id: 'unvalued', dealDeltaPct: null }),
-    ]);
-    const recs = await svc.topPicks();
-    expect(recs).toHaveLength(1);
-    expect(recs[0].listing.id).toBe('valued');
+  // Cold-start
+
+  describe('cold-start (no favorites, no search history)', () => {
+    beforeEach(() => {
+      prismaMock.favorite.findMany.mockResolvedValue([]);
+      searchHistoryMock.recent.mockResolvedValue([]);
+    });
+
+    it('sorts by deal score only (most underpriced first)', async () => {
+      const listings = [
+        makeListing({ id: 'l1', dealDeltaPct: 0 }),   // at market → deal 0.5
+        makeListing({ id: 'l2', dealDeltaPct: -30 }),  // 30% below → deal 1.0
+        makeListing({ id: 'l3', dealDeltaPct: 10 }),   // 10% over → deal ~0.33
+      ];
+      listingsMock.findActive.mockResolvedValue(listings);
+
+      const results = await service.recommend(userId, 10);
+      expect(results[0].id).toBe('l2');
+      expect(results[1].id).toBe('l1');
+      expect(results[2].id).toBe('l3');
+    });
+
+    it('handles null dealDeltaPct (unvaluated listing) as neutral 0.5', async () => {
+      const listings = [
+        makeListing({ id: 'l1', dealDeltaPct: null }),
+        makeListing({ id: 'l2', dealDeltaPct: -10 }),
+      ];
+      listingsMock.findActive.mockResolvedValue(listings);
+
+      const results = await service.recommend(userId, 10);
+      expect(results[0].id).toBe('l2'); // −10% beats neutral
+    });
+
+    it('respects the limit parameter', async () => {
+      const listings = Array.from({ length: 20 }, (_, i) =>
+        makeListing({ id: `l${i}`, dealDeltaPct: -i }),
+      );
+      listingsMock.findActive.mockResolvedValue(listings);
+
+      const results = await service.recommend(userId, 5);
+      expect(results).toHaveLength(5);
+    });
+
+    it('returns empty array when no active listings', async () => {
+      listingsMock.findActive.mockResolvedValue([]);
+      const results = await service.recommend(userId, 10);
+      expect(results).toEqual([]);
+    });
+
+    it('why string mentions below-market price for underpriced listings', async () => {
+      listingsMock.findActive.mockResolvedValue([
+        makeListing({ id: 'l1', dealDeltaPct: -20 }),
+      ]);
+      const results = await service.recommend(userId, 10);
+      expect(results[0].why).toContain('below market');
+    });
   });
 
-  it('honours the limit (clamped to 1..24)', async () => {
-    const many = Array.from({ length: 10 }, (_, i) =>
-      view({ id: `l${i}`, dealDeltaPct: -i }),
+  // Preference scoring
+
+  describe('with preference profile', () => {
+    const favoritedListing = makeListing({
+      id: 'fav_listing',
+      manufacturer: 'toyota',
+      type: 'suv',
+      fuel: 'gas',
+      drive: 'awd',
+    });
+
+    beforeEach(() => {
+      prismaMock.favorite.findMany.mockResolvedValue([
+        { listing: favoritedListing, createdAt: new Date() },
+      ]);
+      searchHistoryMock.recent.mockResolvedValue([]);
+    });
+
+    it('scores a listing matching top preferences higher than a cold match', async () => {
+      const preferred = makeListing({
+        id: 'preferred',
+        manufacturer: 'toyota',
+        type: 'suv',
+        fuel: 'gas',
+        drive: 'awd',
+        dealDeltaPct: 0,
+      });
+      const mismatch = makeListing({
+        id: 'mismatch',
+        manufacturer: 'honda',
+        type: 'sedan',
+        fuel: 'electric',
+        drive: 'fwd',
+        dealDeltaPct: 0,
+      });
+      listingsMock.findActive.mockResolvedValue([mismatch, preferred]);
+
+      const results = await service.recommend(userId, 10);
+      const preferredIdx = results.findIndex((r) => r.id === 'preferred');
+      const mismatchIdx = results.findIndex((r) => r.id === 'mismatch');
+      expect(preferredIdx).toBeLessThan(mismatchIdx);
+    });
+
+    it('why string mentions preferred manufacturer and type', async () => {
+      listingsMock.findActive.mockResolvedValue([
+        makeListing({
+          id: 'l1',
+          manufacturer: 'toyota',
+          type: 'suv',
+          fuel: 'gas',
+          drive: 'awd',
+          dealDeltaPct: null,
+        }),
+      ]);
+      const results = await service.recommend(userId, 10);
+      expect(results[0].why).toContain('manufacturer (toyota)');
+      expect(results[0].why).toContain('type (suv)');
+    });
+
+    it('search history filter hits contribute to make preference', async () => {
+      prismaMock.favorite.findMany.mockResolvedValue([]);
+      searchHistoryMock.recent.mockResolvedValue([
+        { filters: { make: 'ford', type: 'truck' }, createdAt: new Date() },
+        { filters: { make: 'ford' }, createdAt: new Date() },
+      ]);
+      listingsMock.findActive.mockResolvedValue([
+        makeListing({ id: 'ford_truck', manufacturer: 'ford', type: 'truck', dealDeltaPct: 0 }),
+        makeListing({ id: 'toyota_sedan', manufacturer: 'toyota', type: 'sedan', dealDeltaPct: 0 }),
+      ]);
+
+      const results = await service.recommend(userId, 10);
+      expect(results[0].id).toBe('ford_truck');
+    });
+
+    it('score is deterministic on the same fixture data', async () => {
+      const listings = [
+        makeListing({ id: 'a', manufacturer: 'toyota', dealDeltaPct: -5 }),
+        makeListing({ id: 'b', manufacturer: 'honda', dealDeltaPct: -5 }),
+      ];
+      listingsMock.findActive.mockResolvedValue(listings);
+
+      const r1 = await service.recommend(userId, 10);
+      const r2 = await service.recommend(userId, 10);
+      expect(r1.map((r) => r.id)).toEqual(r2.map((r) => r.id));
+      expect(r1.map((r) => r.score)).toEqual(r2.map((r) => r.score));
+    });
+  });
+
+  // excludeUserId
+
+  it('passes excludeUserId so own listings never appear', async () => {
+    prismaMock.favorite.findMany.mockResolvedValue([]);
+    searchHistoryMock.recent.mockResolvedValue([]);
+    listingsMock.findActive.mockResolvedValue([]);
+
+    await service.recommend(userId, 10);
+    expect(listingsMock.findActive).toHaveBeenCalledWith(
+      expect.objectContaining({ excludeUserId: userId }),
     );
-    const svc = serviceWith(many);
-    expect(await svc.topPicks({ limit: 3 })).toHaveLength(3);
-  });
-
-  it('attaches a score and a why string to each pick', async () => {
-    const svc = serviceWith([view({ id: 'a', dealDeltaPct: -14 })]);
-    const [rec] = await svc.topPicks();
-    expect(rec.score).toBeGreaterThan(0.5);
-    expect(rec.why).toMatch(/below the model/i);
-  });
-});
-
-describe('dealScore', () => {
-  it('maps a 20% discount to 1.0 and a 20% markup to 0.0', () => {
-    expect(dealScore(-20)).toBe(1);
-    expect(dealScore(20)).toBe(0);
-    expect(dealScore(0)).toBe(0.5);
-  });
-});
-
-describe('buildWhy', () => {
-  it('calls a 10%+ discount a great deal', () => {
-    expect(buildWhy(-14)).toMatch(/great deal/i);
-  });
-  it('describes a small markup as fairly priced', () => {
-    expect(buildWhy(4)).toMatch(/fairly priced/i);
   });
 });

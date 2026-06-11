@@ -39,7 +39,7 @@ function makeCtx(
   return {
     getHandler: () => ({}),
     getClass: () => ({}),
-    switchToHttp: () => ({ getRequest: () => ({ user }) }),
+    switchToHttp: () => ({ getRequest: () => ({ user, headers: {} }) }),
   } as unknown as ExecutionContext;
 }
 

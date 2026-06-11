@@ -40,19 +40,20 @@ enum PriceChangeReason {
 // User
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String   @id @default(cuid())
+  email         String   @unique
   passwordHash  String
-  role          Role      @default(user)
-  emailVerified Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  role          Role     @default(user)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   refreshTokens           RefreshToken[]
   emailVerificationTokens EmailVerificationToken[]
   auditLogs               AuditLog[]
-  listings               Listing[]
+  listings                Listing[]
   favorites               Favorite[]
+  searchHistory           SearchHistory[]
 
   @@index([email])
 }
@@ -66,7 +67,7 @@ model User {
 // on any spec/price change), never supplied by the client.
 
 model Listing {
-  id           String        @id @default(cuid())
+  id String @id @default(cuid())
 
   // ── Spec fields (1:1 with model-service /predict input) ──
   manufacturer String
@@ -114,9 +115,9 @@ model Listing {
 // ListingPriceHistory
 //
 // Append-only audit trail: one row every time a listing's askingPrice or its
-// valuation (predictedValue/Low/High) changes — including the initial create. Written
-// transactionally alongside the Listing so a price and its audit row never
-// drift apart.
+// valuation (predictedValue/Low/High) changes — including the initial create.
+// Written transactionally alongside the Listing so a price and its audit row
+// never drift apart.
 
 model ListingPriceHistory {
   id        String  @id @default(cuid())
@@ -159,21 +160,39 @@ model Favorite {
   @@index([listingId])
 }
 
+// SearchHistory
+//
+// One row per browse call made by an authenticated user. userId is nullable
+// (SetNull on user delete) so the row survives account deletion while still
+// preserving the aggregate signal. Guest browse calls are not recorded —
+// collecting anonymous data has no recommendation value and adds privacy risk.
+
+model SearchHistory {
+  id        String   @id @default(cuid())
+  userId    String?
+  filters   Json
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
 // RefreshToken
 
 model RefreshToken {
   // tokenHash stores the SHA-256 of the raw token — nunca el token como tal
   // familyId groups the token chain for a single login session so the whole
   // family can be revoked when a reuse-attack is detected
-  id         String    @id @default(cuid())
-  userId     String
-  tokenHash  String
-  familyId   String
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([familyId])
@@ -183,14 +202,14 @@ model RefreshToken {
 // EmailVerificationToken
 
 model EmailVerificationToken {
-  id         String    @id @default(cuid())
-  userId     String
-  tokenHash  String
-  expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tokenHash])
 }
@@ -201,15 +220,15 @@ model EmailVerificationToken {
 // and so rows survive user deletion (onDelete: SetNull, not Cascade).
 
 model AuditLog {
-  id        String      @id @default(cuid())
+  id        String     @id @default(cuid())
   userId    String?
   event     AuditEvent
   ip        String?
   userAgent String?
   metadata  Json?
-  createdAt DateTime    @default(now())
+  createdAt DateTime   @default(now())
 
-  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([event])
