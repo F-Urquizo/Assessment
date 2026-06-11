@@ -12,6 +12,7 @@ import {
   logout as apiLogout,
   refreshAccessToken,
 } from '../lib/api';
+import { onTokenChange, setAccessToken as storeToken } from '../lib/token-store';
 
 // The access token lives in React state only (never localStorage — XSS vector;
 // see docs/API_CONTRACT.md). It is lost on reload by design: the httpOnly
@@ -37,6 +38,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Keep React state in sync with the token store: the 401 interceptor in
+  // auth-request.ts refreshes tokens (or kills the session) outside React.
+  useEffect(() => {
+    onTokenChange((token) => {
+      setAccessToken(token);
+      if (!token) {
+        sessionStorage.removeItem(USER_CACHE_KEY);
+        setUser(null);
+      }
+    });
+    return () => onTokenChange(null);
+  }, []);
+
   // Silent session restore on startup: if the refresh cookie is still valid we
   // get a fresh access token; otherwise the user is simply logged out.
   useEffect(() => {
@@ -44,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshAccessToken()
       .then(({ accessToken }) => {
         if (cancelled) return;
-        setAccessToken(accessToken);
+        storeToken(accessToken);
         setUser(readCachedUser());
       })
       .catch(() => {
@@ -61,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const { accessToken, user } = await apiLogin(email, password);
     sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
-    setAccessToken(accessToken);
+    storeToken(accessToken);
     setUser(user);
   }, []);
 
@@ -71,9 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiLogout();
     } finally {
-      sessionStorage.removeItem(USER_CACHE_KEY);
-      setAccessToken(null);
-      setUser(null);
+      storeToken(null);
     }
   }, []);
 
