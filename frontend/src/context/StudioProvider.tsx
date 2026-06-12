@@ -6,33 +6,56 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Analysis, FormValues, FormField, Options, Payload } from '../types';
+import { useSearchParams } from 'react-router-dom';
+import type {
+  Analysis,
+  FormValues,
+  FormField,
+  Options,
+  Payload,
+  TabName,
+} from '../types';
 import { analyze } from '../lib/api';
 import { useToast } from './ToastContext';
 import { StudioContext, type StudioContextValue } from './StudioContext';
 
 const DEFAULT_ANNUAL_MILES = 12000;
 
+// The Studio tab lives in the URL (`/studio?tab=sell`) so each tab — Sell in
+// particular — is linkable from the top nav and survives Back/refresh.
+const TAB_NAMES: readonly TabName[] = [
+  'appraise',
+  'drivers',
+  'forecast',
+  'deal',
+  'market',
+  'garage',
+  'sell',
+];
+
 const SPEC_FIELDS: FormField[] = [
   'manufacturer', 'model', 'year', 'odometer', 'cylinders', 'condition', 'fuel',
   'title_status', 'transmission', 'drive', 'type', 'paint_color', 'state',
 ];
 
-function defaultForm(options: Options): FormValues {
+// Start every field blank: a pre-filled spec sheet reads as if the questions
+// are already answered, which is confusing in the one-at-a-time wizard. The
+// wizard requires each question to be answered before it can advance.
+function defaultForm(): FormValues {
   return {
-    manufacturer: 'ford',
-    model: 'f-150',
-    year: '2015',
-    odometer: '60000',
-    cylinders: '8',
-    condition: 'good',
-    fuel: 'gas',
-    title_status: 'clean',
-    transmission: 'automatic',
-    drive: '4wd',
-    type: 'pickup',
-    paint_color: options.paint_colors[0] ?? '',
-    state: 'ca',
+    manufacturer: '',
+    model: '',
+    year: '',
+    odometer: '',
+    cylinders: '',
+    condition: '',
+    fuel: '',
+    title_status: '',
+    transmission: '',
+    drive: '',
+    type: '',
+    paint_color: '',
+    state: '',
   };
 }
 
@@ -50,15 +73,37 @@ export function StudioProvider({
   children: ReactNode;
 }) {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const initialForm = useMemo(() => defaultForm(options), [options]);
+  const initialForm = useMemo(() => defaultForm(), []);
   const [form, setForm] = useState<FormValues>(initialForm);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [payload, setPayload] = useState<Payload | null>(null);
   const [baseline, setBaseline] = useState<Payload | null>(null);
   const [baseEstimate, setBaseEstimate] = useState<number | null>(null);
   const [annualMiles, setAnnualMilesState] = useState(DEFAULT_ANNUAL_MILES);
-  const [activeTab, setActiveTab] = useState<StudioContextValue['activeTab']>('appraise');
+
+  // Active tab is derived from the URL — single source of truth, so a deep link
+  // or the Back button lands on the right tab. setActiveTab just rewrites it.
+  const tabParam = searchParams.get('tab');
+  const activeTab: TabName = TAB_NAMES.includes(tabParam as TabName)
+    ? (tabParam as TabName)
+    : 'appraise';
+  const setActiveTab = useCallback(
+    (tab: TabName) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (tab === 'appraise') next.delete('tab');
+          else next.set('tab', tab);
+          return next;
+        },
+        { replace: false },
+      );
+    },
+    [setSearchParams],
+  );
+
   const [appraising, setAppraising] = useState(false);
   const [appraised, setAppraised] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +182,7 @@ export function StudioProvider({
         if (data) toast('Report reopened');
       });
     },
-    [runAnalysis, toast],
+    [runAnalysis, toast, setActiveTab],
   );
 
   const setField = useCallback((name: FormField, value: string) => {
@@ -190,7 +235,7 @@ export function StudioProvider({
   }, [
     options, form, setField, resetForm, analysis, payload, baseline, baseEstimate,
     appraising, appraised, error, annualMiles, setAnnualMiles, reforecast, appraise,
-    applyWhatIf, resetSim, reopen, activeTab,
+    applyWhatIf, resetSim, reopen, activeTab, setActiveTab,
   ]);
 
   return <StudioContext.Provider value={value}>{children}</StudioContext.Provider>;
