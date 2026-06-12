@@ -141,6 +141,13 @@ export function mockBrowse(query: BrowseQuery = {}): BrowseResult {
   const pageSize = query.pageSize ?? 20;
 
   let items = LISTINGS.filter((l) => l.status === 'active');
+  const q = query.q?.trim().toLowerCase();
+  if (q)
+    items = items.filter(
+      (l) =>
+        l.manufacturer.toLowerCase().includes(q) ||
+        l.model.toLowerCase().includes(q),
+    );
   if (query.make) items = items.filter((l) => l.manufacturer === query.make);
   if (query.type) items = items.filter((l) => l.type === query.type);
   if (query.state) items = items.filter((l) => l.state === query.state);
@@ -148,6 +155,14 @@ export function mockBrowse(query: BrowseQuery = {}): BrowseResult {
     items = items.filter((l) => l.askingPrice >= query.minPrice!);
   if (query.maxPrice !== undefined)
     items = items.filter((l) => l.askingPrice <= query.maxPrice!);
+  if (query.minYear !== undefined)
+    items = items.filter((l) => l.year >= query.minYear!);
+  if (query.maxYear !== undefined)
+    items = items.filter((l) => l.year <= query.maxYear!);
+  if (query.minMiles !== undefined)
+    items = items.filter((l) => l.odometer >= query.minMiles!);
+  if (query.maxMiles !== undefined)
+    items = items.filter((l) => l.odometer <= query.maxMiles!);
 
   items = sortListings(items, query.sort ?? 'newest');
 
