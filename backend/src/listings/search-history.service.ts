@@ -32,11 +32,16 @@ export class SearchHistoryService {
   private nonNullFilters(dto: BrowseListingsDto): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     const keys = [
+      'q',
       'make',
       'type',
       'state',
       'minPrice',
       'maxPrice',
+      'minYear',
+      'maxYear',
+      'minMiles',
+      'maxMiles',
       'sort',
     ] as const;
     for (const k of keys) {

@@ -46,7 +46,7 @@ export default function RecommendationsRail({
     <section className="recs-rail-wrap" aria-label="Recommended for you">
       <div className="recs-rail-head">
         <h2 className="recs-rail-title">Recommended for you</h2>
-        <span className="recs-rail-sub">Best deals against the model right now</span>
+        <span className="recs-rail-sub">Best deals against Bluebook value right now</span>
       </div>
       <div className="recs-rail">
         {state.recs.map((rec) => (

@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import ListingDetailPage from './pages/ListingDetailPage';
 import { AuthProvider } from './context/auth-provider';
 import { FavoritesProvider } from './context/FavoritesProvider';
 import { MyListingsProvider } from './context/MyListingsProvider';
@@ -35,12 +36,13 @@ export default function App() {
     // that consume it. AuthProvider swaps in context/auth-provider.ts.
     <AuthProvider>
       <FavoritesProvider>
-        <MyListingsProvider options={options}>
+        <MyListingsProvider>
           <a href="#main-content" className="skip-link">Skip to main content</a>
           <ModeNav />
           <main id="main-content">
           <Routes>
             <Route path="/" element={<Marketplace options={options} />} />
+            <Route path="/listings/:id" element={<ListingDetailPage />} />
             <Route
               path="/favorites"
               element={

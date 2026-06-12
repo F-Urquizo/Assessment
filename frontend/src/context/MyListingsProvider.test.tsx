@@ -6,7 +6,6 @@ import { MockAuthProvider } from './MockAuthProvider';
 import { AuthContext, type AuthContextValue } from './AuthContext';
 import { MyListingsProvider } from './MyListingsProvider';
 import { useMyListings, type GarageBridge } from './MyListingsContext';
-import { MOCK_OPTIONS } from '../lib/marketplace-mock';
 
 const LOGGED_OUT: AuthContextValue = {
   user: null,
@@ -64,7 +63,7 @@ describe('MyListingsProvider', () => {
   it('creates a listing from the form and removes it (optimistic, offline-safe)', async () => {
     render(
       <MockAuthProvider>
-        <MyListingsProvider options={MOCK_OPTIONS}>
+        <MyListingsProvider>
           <Probe />
         </MyListingsProvider>
       </MockAuthProvider>,
@@ -100,7 +99,7 @@ describe('MyListingsProvider', () => {
     }
     render(
       <MockAuthProvider>
-        <MyListingsProvider options={MOCK_OPTIONS}>
+        <MyListingsProvider>
           <BadProbe />
         </MyListingsProvider>
       </MockAuthProvider>,
@@ -132,7 +131,7 @@ describe('MyListingsProvider', () => {
     }
     render(
       <AuthContext.Provider value={LOGGED_OUT}>
-        <MyListingsProvider options={MOCK_OPTIONS}>
+        <MyListingsProvider>
           <GuardProbe />
         </MyListingsProvider>
       </AuthContext.Provider>,
@@ -158,7 +157,7 @@ describe('MyListingsProvider', () => {
     }
     render(
       <MockAuthProvider>
-        <MyListingsProvider options={MOCK_OPTIONS}>
+        <MyListingsProvider>
           <GarageProbe />
         </MyListingsProvider>
       </MockAuthProvider>,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Appraisal } from '../../types';
 import type {
   ListingDetail as ListingDetailData,
@@ -10,6 +11,7 @@ import { mockListingDetail } from '../../lib/marketplace-mock';
 import { evaluateDeal } from '../../lib/deal';
 import { fmt, fmtN } from '../../lib/format';
 import { useFavorites } from '../../context/FavoritesContext';
+import { useAuth } from '../../context/AuthContext';
 
 type DetailState =
   | { status: 'loading' }
@@ -57,9 +59,7 @@ export default function ListingDetail({
       <button className="linkbtn detail-back" onClick={onBack}>
         ← back to marketplace
       </button>
-      {state.status === 'loading' && (
-        <div className="mkt-loading">Loading listing…</div>
-      )}
+      {state.status === 'loading' && <DetailSkeleton />}
       {state.status === 'error' && <div className="rec-empty">⚠ {state.message}</div>}
       {state.status === 'done' && <DetailBody listing={state.listing} />}
     </>
@@ -67,8 +67,6 @@ export default function ListingDetail({
 }
 
 function DetailBody({ listing }: { listing: ListingDetailData }) {
-  const { isFavorite, toggle } = useFavorites();
-  const favorited = isFavorite(listing.id);
   const title =
     `${listing.year} ${listing.manufacturer} ${listing.model}`.toUpperCase();
 
@@ -78,15 +76,7 @@ function DetailBody({ listing }: { listing: ListingDetailData }) {
         <div className="view-kicker">Listing · detail</div>
         <div className="detail-title-row">
           <div className="view-title">{title}</div>
-          <button
-            className={'fav-btn' + (favorited ? ' on' : '')}
-            aria-pressed={favorited}
-            aria-label={favorited ? 'Remove from favourites' : 'Save to favourites'}
-            onClick={() => toggle(listing)}
-          >
-            <span aria-hidden="true">{favorited ? '♥' : '♡'}</span>{' '}
-            {favorited ? 'Saved' : 'Save'}
-          </button>
+          <FavoriteButton listing={listing} />
         </div>
         <div className="subject-strip">
           <span className="veh">
@@ -107,6 +97,62 @@ function DetailBody({ listing }: { listing: ListingDetailData }) {
   );
 }
 
+/**
+ * Save-to-favourites control. For a guest it does NOT optimistically toggle —
+ * favourites are per-account and a swallowed 401 would otherwise flip the button
+ * to "Saved" without persisting anything. Instead it routes to login, carrying
+ * the listing as `state.from` so the user lands back here afterwards.
+ */
+function FavoriteButton({ listing }: { listing: ListingDetailData }) {
+  const { isAuthenticated } = useAuth();
+  const { isFavorite, toggle } = useFavorites();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return (
+      <button
+        className="fav-btn"
+        aria-label="Log in to save this listing to favourites"
+        onClick={() =>
+          navigate('/login', { state: { from: location.pathname } })
+        }
+      >
+        <span aria-hidden="true">♡</span> Log in to save
+      </button>
+    );
+  }
+
+  const favorited = isFavorite(listing.id);
+  return (
+    <button
+      className={'fav-btn' + (favorited ? ' on' : '')}
+      aria-pressed={favorited}
+      aria-label={favorited ? 'Remove from favourites' : 'Save to favourites'}
+      onClick={() => toggle(listing)}
+    >
+      <span aria-hidden="true">{favorited ? '♥' : '♡'}</span>{' '}
+      {favorited ? 'Saved' : 'Save'}
+    </button>
+  );
+}
+
+/** Skeleton placeholder matching the detail layout — consistent with the
+ *  marketplace grid's skeletons instead of a bare "Loading…" line. */
+function DetailSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading listing">
+      <div className="skeleton skel-line skel-line-lg" />
+      <div className="skeleton skel-line skel-line-sm" />
+      <div className="skeleton skel-block" />
+      <div className="grid-2" style={{ marginTop: 26 }}>
+        <div className="skeleton skel-block" />
+        <div className="skeleton skel-block" />
+      </div>
+    </div>
+  );
+}
+
 function ValuationAnalysis({ listing }: { listing: ListingDetailData }) {
   const badge = listing.dealBadge ? DEAL_BADGE_META[listing.dealBadge] : null;
 
@@ -119,7 +165,7 @@ function ValuationAnalysis({ listing }: { listing: ListingDetailData }) {
       <div className="card" style={{ marginTop: 26 }}>
         <div className="card-title">Model valuation</div>
         <div className="rec-empty">
-          This listing hasn’t been valued by the model yet.
+          This listing hasn’t been valued by Bluebook yet.
         </div>
       </div>
     );
@@ -160,7 +206,7 @@ function ValuationAnalysis({ listing }: { listing: ListingDetailData }) {
               textTransform: 'uppercase',
             }}
           >
-            vs model value
+            vs Bluebook value
           </div>
         </div>
       </div>
@@ -168,7 +214,7 @@ function ValuationAnalysis({ listing }: { listing: ListingDetailData }) {
       <div className="deal-scale">
         <div className="deal-scale-bar">
           <div className="deal-mark" style={{ left: `${fairPct}%` }}>
-            <span className="cap">model value</span>
+            <span className="cap">Bluebook value</span>
           </div>
           <div className="deal-ask" style={{ left: `${askPct}%` }}>
             <span className="pin">

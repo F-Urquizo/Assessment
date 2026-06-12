@@ -214,6 +214,43 @@ describe('AuthService', () => {
     });
   });
 
+  // ── resendVerification ──────────────────────────────────────────────────────
+
+  describe('resendVerification', () => {
+    it('issues a fresh token and emails the link for an unverified account', async () => {
+      usersMock.findByEmail.mockResolvedValue({
+        ...baseUser,
+        emailVerified: false,
+      });
+
+      await service.resendVerification('user@example.com');
+
+      expect(prismaMock.emailVerificationToken.create).toHaveBeenCalledTimes(1);
+      expect(mailMock.sendVerificationEmail).toHaveBeenCalledWith(
+        baseUser.email,
+        expect.stringContaining('/verify-email?token='),
+      );
+    });
+
+    it('does nothing for an already-verified account', async () => {
+      usersMock.findByEmail.mockResolvedValue(baseUser); // emailVerified: true
+
+      await service.resendVerification('user@example.com');
+
+      expect(prismaMock.emailVerificationToken.create).not.toHaveBeenCalled();
+      expect(mailMock.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('does nothing (and does not throw) for an unknown account', async () => {
+      usersMock.findByEmail.mockResolvedValue(null);
+
+      await expect(
+        service.resendVerification('nobody@example.com'),
+      ).resolves.toBeUndefined();
+      expect(mailMock.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+  });
+
   // ── login ─────────────────────────────────────────────────────────────────
 
   describe('login', () => {

@@ -112,6 +112,9 @@ button.appraise:disabled { opacity: .55; cursor: wait; }
 @media (max-width: 480px) { .odo-cell { width: 36px; height: 56px; } .odo-strip span { height: 56px; font-size: 28px; } .odo-cell.sym { width: 22px; font-size: 26px; } }
 .plate-caption { text-align: center; font-size: 10px; letter-spacing: .32em; text-transform: uppercase; color: rgba(242,236,221,.6); margin-bottom: 22px; }
 .range { border-top: 1px solid rgba(242,236,221,.22); padding-top: 18px; opacity: 0; transform: translateY(8px); transition: opacity .6s ease .3s, transform .6s ease .3s; }
+/* Collapse to zero height before a result so it doesn't reserve a gap above the
+   footer (the empty-state fills the plate instead); reverts + reveals on .show. */
+.range:not(.show) { max-height: 0; padding-top: 0; border-top-width: 0; overflow: hidden; }
 .range.show { opacity: 1; transform: none; }
 .range-label { display: flex; justify-content: space-between; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(242,236,221,.65); margin-bottom: 10px; }
 .range-bar { height: 8px; background: var(--green-deep); border-radius: 4px; position: relative; overflow: hidden; }
@@ -282,7 +285,19 @@ footer { margin-top: 72px; padding-top: 18px; border-top: 3px solid var(--ink); 
 /* ── Marketplace (Andrés · A1) ─────────────────────────────────────────────── */
 
 /* TEMP top-level section switch — replaced by Ramiro's real nav. */
-.mode-nav { position: fixed; top: 16px; right: 18px; z-index: 1000; display: flex; transform: translateZ(0); border: 1.5px solid var(--ink); background: var(--paper-dark); box-shadow: 3px 3px 0 var(--amber); }
+.mode-nav { position: fixed; top: 16px; right: 18px; z-index: 1000; display: flex; align-items: stretch; transform: translateZ(0); border: 1.5px solid var(--ink); background: var(--paper-dark); box-shadow: 3px 3px 0 var(--amber); }
+
+/* Items collapse horizontally via the grid 1fr→0fr technique (animatable, and
+   works with the variable-width account email); the inner wrapper clips the
+   flex row as it shrinks. The hamburger morphs in/out via max-width + opacity.
+   Both share an easing so the bar smoothly trades one for the other. */
+.mode-nav-items { display: grid; grid-template-columns: 1fr; opacity: 1; transition: grid-template-columns .32s ease, opacity .24s ease; }
+.mode-nav.collapsed .mode-nav-items { grid-template-columns: 0fr; opacity: 0; }
+.mode-nav-inner { display: flex; min-width: 0; overflow: hidden; white-space: nowrap; }
+
+.mode-burger { display: inline-flex; align-items: center; justify-content: center; overflow: hidden; max-width: 0; padding: 8px 0; opacity: 0; font-size: 17px; line-height: 1; border: none; background: none; color: var(--ink); cursor: pointer; transition: max-width .32s ease, padding .32s ease, opacity .24s ease; }
+.mode-burger:hover { color: var(--amber); }
+.mode-nav.collapsed .mode-burger { max-width: 52px; padding: 8px 14px; opacity: 1; }
 .mode-tab { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; padding: 9px 16px; border: none; background: none; cursor: pointer; color: rgba(32,37,31,.72); transition: color .15s; text-decoration: none; display: inline-block; }
 .mode-tab:hover { color: var(--ink); }
 .mode-tab.active { background: var(--green); color: var(--paper); }
@@ -435,3 +450,79 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 2px;
 }
+
+/* ── Usability pass ─────────────────────────────────────────────────────────── */
+
+/* Sell view — "start from your garage" picker (prefills the form from a saved
+   appraisal, right where you list). */
+.sell-garage { margin-top: 30px; }
+.sell-garage-row { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; margin-top: 14px; scroll-snap-type: x proximity; }
+.sell-garage-card { flex: 0 0 210px; scroll-snap-align: start; text-align: left; background: var(--paper-card); border: 1px solid var(--rule); border-left: 4px solid var(--amber); padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.sell-garage-card:hover { transform: translate(-2px,-2px); box-shadow: 4px 4px 0 rgba(146,49,34,.3); }
+.sgc-veh { font-family: var(--serif); font-size: 18px; line-height: 1.05; color: var(--ink); }
+.sgc-meta { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: rgba(32,37,31,.6); }
+.sgc-est { font-size: 15px; font-weight: 600; color: var(--green); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.sgc-cta { margin-top: 6px; font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--amber); }
+
+/* Value-plate empty state — before an estimate runs, fill the plate with a prompt
+   + a preview of what the report delivers (onboarding for first-time users). */
+.plate-empty { border-top: 1px solid rgba(242,236,221,.22); padding-top: 20px; animation: fadeUp .5s ease both; }
+.plate-empty-lead { font-size: 13px; line-height: 1.5; color: rgba(242,236,221,.82); margin: 0 0 16px; }
+.plate-empty-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 11px; }
+.plate-empty-list li { position: relative; padding-left: 22px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: rgba(242,236,221,.62); }
+.plate-empty-list li::before { content: "→"; position: absolute; left: 0; color: var(--amber-bright); }
+
+/* Value-drivers sticky price bar — keeps the live (simulated) estimate on screen
+   while the user clicks chips and scrolls the sensitivity list. Price sits on the
+   left (never under the collapsed nav at the top-right); band is sacrificial. */
+.drivers-price-bar { position: sticky; top: 0; z-index: 50; display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; margin: 20px 0 6px; padding: 12px 20px; background: var(--paper); border: 1.5px solid var(--ink); box-shadow: 0 3px 0 var(--amber); }
+.dpb-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dpb-veh { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: rgba(32,37,31,.7); }
+.dpb-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.dpb-est { font-family: var(--serif); font-size: 34px; line-height: 1; color: var(--amber); font-variant-numeric: tabular-nums; }
+.dpb-delta { font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 4px 9px; border: 1.5px solid; font-variant-numeric: tabular-nums; }
+.dpb-delta.up { color: var(--green-mid); border-color: var(--green-mid); background: rgba(36,53,98,.10); }
+.dpb-delta.down { color: var(--red); border-color: var(--red); background: rgba(163,51,31,.08); }
+.dpb-band { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: rgba(32,37,31,.66); white-space: nowrap; }
+
+/* Marketplace search + filter bar */
+.mkt-filters-wrap { margin-top: 28px; }
+.mkt-filters-wrap .mkt-filters { margin-top: 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0 26px; }
+.mkt-search { padding-top: 0; }
+.mkt-search input { font-size: 18px; }
+.mkt-search input::placeholder { color: rgba(32,37,31,.45); font-size: 14px; }
+.mkt-clear { margin-top: 14px; }
+.mkt-count { margin-top: 22px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgba(32,37,31,.62); }
+
+/* Inline field error (sell form + auth) */
+.field-error { color: var(--red); font-size: 11px; letter-spacing: .03em; line-height: 1.4; margin: 6px 0 0; }
+.field input[aria-invalid="true"], .field select[aria-invalid="true"] { color: var(--red); }
+.field:has(input[aria-invalid="true"]) { border-bottom-color: var(--red); }
+
+/* My-listings inline delete confirm */
+.mylisting-confirm { gap: 12px; flex-wrap: wrap; }
+.mylisting-confirm-q { font-size: 11px; letter-spacing: .06em; color: var(--ink); margin-right: auto; }
+
+/* Auth: resend verification link */
+.auth-resend { margin-top: 14px; display: inline-block; }
+
+/* Wizard: clickable stepper */
+.wiz-steps { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; padding: 0; margin: 0 0 8px; }
+.wiz-step-dot { font-family: var(--mono); font-size: 10px; font-weight: 600; width: 30px; height: 30px; border: 1.5px solid var(--rule); background: var(--paper); color: rgba(32,37,31,.6); cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+.wiz-step-dot:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); }
+.wiz-step-dot.done { border-color: var(--green); color: var(--green); }
+.wiz-step-dot.cur { background: var(--green); border-color: var(--green); color: var(--paper); }
+.wiz-step-dot:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Wizard: review screen */
+.wiz-review { margin: 4px 0 4px; }
+.wiz-review-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--rule-soft); }
+.wiz-review-row dt { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgba(32,37,31,.66); }
+.wiz-review-row dd { margin: 0; display: flex; align-items: baseline; gap: 14px; }
+.wiz-review-val { font-family: var(--mono); font-size: 14px; color: var(--ink); }
+
+/* Detail loading skeletons */
+.skel-line { height: 18px; margin-bottom: 12px; }
+.skel-line-lg { height: 30px; width: 60%; }
+.skel-line-sm { width: 40%; }
+.skel-block { height: 150px; border: 1px solid var(--rule); margin-top: 8px; }

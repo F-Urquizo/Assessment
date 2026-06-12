@@ -22,8 +22,8 @@ export default function MarketView() {
         <div className="view-kicker">Report · 05</div>
         <div className="view-title">Market context</div>
         <div className="view-sub">
-          Where this vehicle sits inside its real comparable set — drawn from the
-          20,000-listing reference index the model was trained on.
+          Where this vehicle sits inside its real comparable set — drawn from 20,000
+          real used-car listings.
         </div>
         <SubjectStrip payload={payload} appraisal={analysis.appraisal} />
       </div>

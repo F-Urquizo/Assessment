@@ -29,14 +29,14 @@ function buyerVerdict(
 ): Pick<DealVerdict, 'cls' | 'title' | 'sub'> {
   const ratio = ask / estimate;
   if (ask <= low)
-    return { cls: 'v-great', title: 'Great deal', sub: 'At or below the model’s pessimistic floor' };
+    return { cls: 'v-great', title: 'Great deal', sub: 'At or below Bluebook’s low estimate' };
   if (ratio < 0.97)
     return { cls: 'v-good', title: 'Good buy', sub: 'Priced below fair value' };
   if (ratio <= 1.03)
     return { cls: 'v-fair', title: 'Fair price', sub: 'Right around fair value' };
   if (ask <= high)
     return { cls: 'v-high', title: 'A bit high', sub: 'Above fair value but inside the band' };
-  return { cls: 'v-over', title: 'Overpriced', sub: 'Above the model’s optimistic ceiling' };
+  return { cls: 'v-over', title: 'Overpriced', sub: 'Above Bluebook’s high estimate' };
 }
 
 function sellerVerdict(

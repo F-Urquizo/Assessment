@@ -22,9 +22,9 @@ export function dealScore(deltaPct: number): number {
 /** Human "why" shown on the recommendation card. */
 export function buildWhy(deltaPct: number): string {
   const pct = Math.round(Math.abs(deltaPct));
-  if (deltaPct <= -10) return `Great deal — ${pct}% below the model's valuation`;
-  if (deltaPct < 0) return `Priced ${pct}% under model value`;
-  if (deltaPct === 0) return `Priced right at model value`;
-  if (deltaPct <= 10) return `Fairly priced — about ${pct}% over model value`;
-  return `Priced ${pct}% over model value`;
+  if (deltaPct <= -10) return `Great deal — ${pct}% below Bluebook value`;
+  if (deltaPct < 0) return `Priced ${pct}% under Bluebook value`;
+  if (deltaPct === 0) return `Priced right at Bluebook value`;
+  if (deltaPct <= 10) return `Fairly priced — about ${pct}% over Bluebook value`;
+  return `Priced ${pct}% over Bluebook value`;
 }

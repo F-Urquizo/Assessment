@@ -43,7 +43,7 @@ export default function ListingCard({
             className={`deal-badge ${badge.cls}`}
             aria-label={
               delta !== null
-                ? `${badge.label}, ${Math.round(delta)} percent versus model value`
+                ? `${badge.label}, ${Math.round(delta)} percent versus Bluebook value`
                 : badge.label
             }
           >
@@ -76,7 +76,7 @@ export default function ListingCard({
             <>
               <div className="listing-model-v">{fmt(listing.predictedValue!)}</div>
               <div className="listing-model-l">
-                Model value
+                Bluebook value
                 {listing.predictedLow !== null && listing.predictedHigh !== null && (
                   <>
                     {' · '}

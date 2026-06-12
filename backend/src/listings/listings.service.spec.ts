@@ -549,6 +549,36 @@ describe('ListingsService', () => {
       });
     });
 
+    it('matches a keyword against make OR model, case-insensitively', async () => {
+      await service.browse({ q: 'tacoma' });
+      expect(browseWhere()).toEqual({
+        status: ListingStatus.active,
+        OR: [
+          { manufacturer: { contains: 'tacoma', mode: 'insensitive' } },
+          { model: { contains: 'tacoma', mode: 'insensitive' } },
+        ],
+      });
+    });
+
+    it('ignores a blank/whitespace keyword', async () => {
+      await service.browse({ q: '   ' });
+      expect(browseWhere()).toEqual({ status: ListingStatus.active });
+    });
+
+    it('applies year and mileage ranges', async () => {
+      await service.browse({
+        minYear: 2018,
+        maxYear: 2022,
+        minMiles: 10000,
+        maxMiles: 60000,
+      });
+      expect(browseWhere()).toEqual({
+        status: ListingStatus.active,
+        year: { gte: 2018, lte: 2022 },
+        odometer: { gte: 10000, lte: 60000 },
+      });
+    });
+
     it.each([
       ['newest', { createdAt: 'desc' }],
       ['priceAsc', { askingPrice: 'asc' }],

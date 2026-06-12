@@ -57,13 +57,47 @@ describe('BrowseListingsDto', () => {
     expect(failed({ type: 'spaceship' })).toContain('type');
   });
 
+  it('accepts a keyword query and year/mileage ranges, coercing numerics', () => {
+    const { dto, errors } = validate({
+      q: 'tacoma',
+      minYear: '2018',
+      maxYear: '2022',
+      minMiles: '0',
+      maxMiles: '60000',
+    });
+    expect(errors).toHaveLength(0);
+    expect(dto.q).toBe('tacoma');
+    expect(dto.minYear).toBe(2018);
+    expect(dto.maxYear).toBe(2022);
+    expect(dto.minMiles).toBe(0);
+    expect(dto.maxMiles).toBe(60000);
+  });
+
+  it('rejects an over-long keyword', () => {
+    expect(failed({ q: 'x'.repeat(81) })).toContain('q');
+  });
+
+  it('rejects an implausible year', () => {
+    expect(failed({ minYear: '1800' })).toContain('minYear');
+    expect(failed({ maxYear: '3000' })).toContain('maxYear');
+  });
+
+  it('rejects negative mileage', () => {
+    expect(failed({ minMiles: '-1' })).toContain('minMiles');
+  });
+
   it('accepts a valid full query', () => {
     const { errors } = validate({
+      q: 'camry',
       make: 'toyota',
       type: 'sedan',
       state: 'ca',
       minPrice: '10000',
       maxPrice: '25000',
+      minYear: '2015',
+      maxYear: '2023',
+      minMiles: '0',
+      maxMiles: '80000',
       sort: 'bestDeal',
       page: '2',
       pageSize: '10',

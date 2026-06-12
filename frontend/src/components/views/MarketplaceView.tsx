@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Options } from '../../types';
-import type { BrowseQuery, BrowseResult } from '../../lib/marketplace-types';
+import type { BrowseResult } from '../../lib/marketplace-types';
 import { fetchListings } from '../../lib/api';
 import { mockBrowse } from '../../lib/marketplace-mock';
 import FilterBar from './FilterBar';
 import {
   DEFAULT_FILTERS,
-  PRICE_BANDS,
+  filtersFromSearchParams,
+  filtersToBrowseQuery,
+  filtersToSearchParams,
   type Filters,
 } from '../../lib/marketplace-filters';
 import ListingCard from './ListingCard';
-import ListingDetail from './ListingDetail';
 import RecommendationsRail from './RecommendationsRail';
 
 const PAGE_SIZE = 12;
@@ -23,31 +25,41 @@ type BrowseState =
   | { status: 'error'; message: string };
 
 export default function MarketplaceView({ options }: { options: Options }) {
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [page, setPage] = useState(1);
-  const [state, setState] = useState<BrowseState>({ status: 'loading' });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  // The URL is the source of truth for filters + page, so a search is shareable,
+  // bookmarkable and survives Back/refresh.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { filters, page } = useMemo(
+    () => filtersFromSearchParams(searchParams),
+    [searchParams],
+  );
 
-  // Changing a filter resets to page 1; everything else preserves the page.
+  const [state, setState] = useState<BrowseState>({ status: 'loading' });
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Changing a filter resets to page 1; changing the page preserves filters.
   const patchFilters = (patch: Partial<Filters>) => {
-    setFilters((prev) => ({ ...prev, ...patch }));
-    setPage(1);
+    setSearchParams(filtersToSearchParams({ ...filters, ...patch }, 1), {
+      replace: true,
+    });
   };
+  const clearFilters = () =>
+    setSearchParams(filtersToSearchParams(DEFAULT_FILTERS, 1), { replace: true });
+  const goToPage = (next: number) =>
+    setSearchParams(filtersToSearchParams(filters, next));
+
+  const query = useMemo(
+    () => filtersToBrowseQuery(filters, page, PAGE_SIZE),
+    [filters, page],
+  );
+  // Stable key so the fetch effect fires only when the effective query changes.
+  const queryKey = JSON.stringify(query);
 
   useEffect(() => {
-    const band = PRICE_BANDS[filters.priceBand];
-    const query: BrowseQuery = {
-      make: filters.make || undefined,
-      type: filters.type || undefined,
-      state: filters.state || undefined,
-      minPrice: band.min,
-      maxPrice: band.max,
-      sort: filters.sort,
-      page,
-      pageSize: PAGE_SIZE,
-    };
-
     let cancelled = false;
+    // Note: we intentionally keep the previous results on screen while the next
+    // query loads (no loading flash on a filter change); the skeletons show only
+    // on first paint, when state starts as 'loading'.
     fetchListings(query)
       .then((result) => {
         if (!cancelled) setState({ status: 'done', result, demo: false });
@@ -60,13 +72,22 @@ export default function MarketplaceView({ options }: { options: Options }) {
     return () => {
       cancelled = true;
     };
-  }, [filters.make, filters.type, filters.state, filters.priceBand, filters.sort, page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey]);
 
+  // Bring the results into view when the query changes (new filter or page) so
+  // paginated/ filtered users aren't left staring at a mid-scroll position.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [queryKey]);
+
+  const openListing = (id: string) => navigate(`/listings/${id}`);
   const total = state.status === 'done' ? state.result.total : null;
-
-  if (selectedId) {
-    return <ListingDetail id={selectedId} onBack={() => setSelectedId(null)} />;
-  }
 
   return (
     <>
@@ -74,9 +95,9 @@ export default function MarketplaceView({ options }: { options: Options }) {
         <div className="view-kicker">Marketplace · 01</div>
         <div className="view-title">The lot</div>
         <div className="view-sub">
-          Every car listed by the community, each priced against the model so you can
-          see at a glance whether it’s a deal. Filter the lot, then open a listing for
-          the full valuation breakdown.
+          Every car listed by the community, each priced against its Bluebook value so
+          you can see at a glance whether it’s a deal. Search or filter the lot, then
+          open a listing for the full valuation breakdown.
         </div>
       </div>
 
@@ -87,21 +108,35 @@ export default function MarketplaceView({ options }: { options: Options }) {
         </div>
       )}
 
-      <RecommendationsRail onOpen={setSelectedId} />
+      <RecommendationsRail onOpen={openListing} />
 
-      <FilterBar options={options} filters={filters} onChange={patchFilters} />
+      <FilterBar
+        options={options}
+        filters={filters}
+        onChange={patchFilters}
+        onClear={clearFilters}
+      />
 
-      <MarketplaceBody state={state} onOpen={setSelectedId} />
+      <div ref={resultsRef}>
+        <ResultCount state={state} />
+        <MarketplaceBody state={state} onOpen={openListing} />
+      </div>
 
       {state.status === 'done' && total !== null && total > PAGE_SIZE && (
-        <Pager
-          page={page}
-          pageSize={PAGE_SIZE}
-          total={total}
-          onPage={setPage}
-        />
+        <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={goToPage} />
       )}
     </>
+  );
+}
+
+/** A small live-region count so users know how many cars matched their search. */
+function ResultCount({ state }: { state: BrowseState }) {
+  if (state.status !== 'done') return null;
+  const n = state.result.total;
+  return (
+    <div className="mkt-count" role="status" aria-live="polite">
+      {n === 0 ? 'No matches' : `${n} car${n === 1 ? '' : 's'}`}
+    </div>
   );
 }
 
@@ -125,7 +160,12 @@ function MarketplaceBody({
     return <div className="rec-empty">⚠ {state.message}</div>;
   }
   if (!state.result.items.length) {
-    return <div className="rec-empty">No listings match these filters.</div>;
+    return (
+      <div className="rec-empty">
+        No listings match these filters. Try widening your search or clearing a
+        filter.
+      </div>
+    );
   }
   return (
     <div className="listing-grid">

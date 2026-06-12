@@ -244,13 +244,40 @@ export class ListingsService {
     if (query.type) where.type = query.type;
     if (query.state) where.state = query.state;
 
-    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
-      const askingPrice: Prisma.IntFilter = {};
-      if (query.minPrice !== undefined) askingPrice.gte = query.minPrice;
-      if (query.maxPrice !== undefined) askingPrice.lte = query.maxPrice;
-      where.askingPrice = askingPrice;
+    // Free-text keyword: case-insensitive substring on make OR model, so
+    // "tacoma" or "f-150" matches regardless of which field it lives in.
+    const q = query.q?.trim();
+    if (q) {
+      where.OR = [
+        { manufacturer: { contains: q, mode: 'insensitive' } },
+        { model: { contains: q, mode: 'insensitive' } },
+      ];
     }
+
+    this.applyRange(
+      where,
+      'askingPrice',
+      query.minPrice,
+      query.maxPrice,
+    );
+    this.applyRange(where, 'year', query.minYear, query.maxYear);
+    this.applyRange(where, 'odometer', query.minMiles, query.maxMiles);
     return where;
+  }
+
+  /** Adds a `{ gte?, lte? }` int range filter for `field`, omitting it entirely
+   *  when neither bound is given (keeps the `where` minimal for exact assertions). */
+  private applyRange(
+    where: Prisma.ListingWhereInput,
+    field: 'askingPrice' | 'year' | 'odometer',
+    min: number | undefined,
+    max: number | undefined,
+  ): void {
+    if (min === undefined && max === undefined) return;
+    const range: Prisma.IntFilter = {};
+    if (min !== undefined) range.gte = min;
+    if (max !== undefined) range.lte = max;
+    where[field] = range;
   }
 
   /** Maps a sort mode to the Prisma `orderBy`. `bestDeal` floats the most

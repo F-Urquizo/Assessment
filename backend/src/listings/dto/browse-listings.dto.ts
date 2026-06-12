@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { STATES, TYPES } from './spec-options';
 
 /** Sort modes the marketplace exposes. `bestDeal` surfaces the most
@@ -13,6 +21,13 @@ export type Sort = (typeof SORTS)[number];
  * (the global ValidationPipe does not have implicit conversion enabled).
  */
 export class BrowseListingsDto {
+  // Free-text keyword — matched case-insensitively against manufacturer + model
+  // so a buyer can find "tacoma" or "f-150" without knowing the exact make.
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  q?: string;
+
   @IsOptional()
   @IsString()
   make?: string; // filters `manufacturer`
@@ -36,6 +51,32 @@ export class BrowseListingsDto {
   @IsInt()
   @Min(0)
   maxPrice?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1900)
+  @Max(2100)
+  minYear?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1900)
+  @Max(2100)
+  maxYear?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minMiles?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxMiles?: number;
 
   @IsOptional()
   @IsIn(SORTS)

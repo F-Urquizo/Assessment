@@ -208,6 +208,29 @@ display a specific "request a new link" prompt rather than a generic error.
 
 ---
 
+### `POST /auth/resend-verification`
+
+Re-issues a verification link for an account that registered but never verified.
+Backs the "Resend verification email" action on the login page (after a `403`)
+and the "Send a new link" form on the verify-email page (after a `410`).
+
+**Request body**
+```json
+{ "email": "user@example.com" }
+```
+
+**Response `202 Accepted`**
+```json
+{ "ok": true }
+```
+
+The response is **always `202`** regardless of whether the account exists or is
+already verified — the endpoint must not reveal account state (no user
+enumeration). An email is actually sent only for an existing, unverified account.
+Rate-limited (3 requests / minute) to resist mail flooding.
+
+---
+
 ## Cookie attributes
 
 ⚠️ **Pending decision** — confirm deploy topology before finalising.

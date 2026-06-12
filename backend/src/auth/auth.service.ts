@@ -59,6 +59,31 @@ export class AuthService {
       throw e;
     }
 
+    await this.issueEmailVerification(user);
+
+    await this.audit.log({ event: AuditEvent.register, userId: user.id });
+
+    return { user: this.users.toPublic(user) };
+  }
+
+  /**
+   * Re-send the verification link for an account that registered but never
+   * verified. Always resolves the same way regardless of whether the account
+   * exists or is already verified, so the endpoint can't be used to enumerate
+   * users — only an unverified, existing account actually triggers an email.
+   */
+  async resendVerification(email: string): Promise<void> {
+    const user = await this.users.findByEmail(email);
+    if (!user || user.emailVerified) return;
+    await this.issueEmailVerification(user);
+  }
+
+  /** Mint a single-use email-verification token and mail the link. Shared by
+   *  registration and the resend flow so both issue identical tokens. */
+  private async issueEmailVerification(user: {
+    id: string;
+    email: string;
+  }): Promise<void> {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
     const expiresAt = new Date(Date.now() + VERIFY_EMAIL_TTL_MS);
@@ -70,10 +95,6 @@ export class AuthService {
     const frontendUrl = this.config.get('FRONTEND_URL', 'http://localhost:5173');
     const link = `${frontendUrl}/verify-email?token=${rawToken}`;
     await this.mail.sendVerificationEmail(user.email, link);
-
-    await this.audit.log({ event: AuditEvent.register, userId: user.id });
-
-    return { user: this.users.toPublic(user) };
   }
 
   async login(dto: LoginDto, ctx: AuditCtx = {}): Promise<LoginResult> {

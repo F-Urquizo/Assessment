@@ -11,22 +11,30 @@ over-priced**.
 ## What it does
 
 - **Valuation Studio** — enter a vehicle's specs through a step-by-step card
-  wizard and a random-forest model returns an estimate, value range, depreciation
-  forecast, value drivers and market context. Save cars to a garage and compare
-  them head-to-head.
-- **Marketplace** — browse community listings with filters (maker, body type,
-  state, price band) and sorting; each card shows a **deal badge** (Under / Fair /
-  Over priced) derived from the model.
-- **Listing detail** — a visual over/under-valued analysis (asking vs. model
-  value), deal verdict, price history, seller contact and a favourite button.
+  wizard, **review every answer**, then run a random-forest model that returns an
+  estimate, value range, depreciation forecast, value drivers and market context.
+  Any answered step is reachable directly from the stepper. Save cars to a garage
+  and compare them head-to-head.
+- **Marketplace** — **keyword search** (make or model) plus filters (maker, body
+  type, state, price band, mileage band, model-year) and sorting; each card shows
+  a **deal badge** (Under / Fair / Over priced) derived from the model. Filters,
+  page and the open listing all live in the **URL**, so a search or a specific car
+  is shareable, bookmarkable and Back-button-correct.
+- **Listing detail** — a routed page (`/listings/:id`) with a visual
+  over/under-valued analysis (asking vs. model value), deal verdict, price
+  history, seller contact and a favourite button (a logged-out visitor is routed
+  to log in rather than shown a save that won't persist).
 - **Recommendations** — a "Recommended for you" rail combining a deal score with
   a preference score (favourites + search history).
-- **Sell / My Listings** — create, edit, delete and toggle the status of your own
-  listings; "List this car →" bridges a saved appraisal into a new listing.
+- **Sell / My Listings** — a top-level nav action (not buried in the Studio):
+  create, edit and toggle the status of your own listings, with **inline
+  per-field validation** and a **two-step delete confirm**; "List this car →"
+  bridges a saved appraisal into a new listing.
 - **Favourites** — save listings to a per-user, protected favourites view.
-- **Accounts & sessions** — register, email verification, login, silent session
-  restore, refresh-token rotation, logout, protected routes and a session-aware
-  nav.
+- **Accounts & sessions** — register, email verification (with a **resend-link**
+  flow when a link expires or login hits an unverified account), login, silent
+  session restore, refresh-token rotation, logout, protected routes and a
+  session-aware nav.
 - **Accessibility** — keyboard-operable controls, ARIA, colour-blind-safe deal
   badges (text + symbol, not colour alone), WCAG-AA contrast, reduced-motion
   support and a **dark mode**.

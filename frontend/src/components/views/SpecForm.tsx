@@ -32,7 +32,7 @@ export default function SpecForm() {
         Vehicle specification sheet
       </div>
       <div className="form-note">
-        Thirteen fields feed a 400-tree forest. Run the report to unlock drivers,
+        Thirteen fields produce your estimate. Run the report to unlock drivers,
         forecast, deal-check and market context.
       </div>
       <form

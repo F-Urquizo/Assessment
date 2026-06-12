@@ -47,16 +47,29 @@ export interface Listing {
   updatedAt: string;
 }
 
+/** Status text colour so a listing's state reads at a glance: amber = draft
+ *  (not live, needs action), green = active (live), muted = sold (closed). */
+export const STATUS_COLOR: Record<ListingStatus, string> = {
+  draft: 'var(--amber)',
+  active: '#2f6b46',
+  sold: 'rgba(32, 37, 31, 0.55)',
+};
+
 /** Sort modes exposed by GET /listings (mirrors BrowseListingsDto `SORTS`). */
 export type ListingSort = 'newest' | 'priceAsc' | 'priceDesc' | 'bestDeal';
 
 /** Query params for GET /listings — every field optional. */
 export interface BrowseQuery {
+  q?: string; // free-text keyword — matched against make + model
   make?: string; // filters `manufacturer`
   type?: string;
   state?: string;
   minPrice?: number;
   maxPrice?: number;
+  minYear?: number;
+  maxYear?: number;
+  minMiles?: number;
+  maxMiles?: number;
   sort?: ListingSort;
   page?: number;
   pageSize?: number;
