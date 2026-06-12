@@ -141,10 +141,6 @@ while data loads, explicit empty copy ("Not valued yet", no-results), and
 graceful fallbacks on failure — so the user is never left staring at a blank or
 ambiguous screen.
 
-> **Dark mode.** A persisted light/dark toggle is implemented on the
-> `andres/dark-mode` branch and is **not yet merged to `main`**; this document
-> describes the state on `main`. Update this note when the branch lands.
-
 ---
 
 ## 5. Responsiveness & visual system
