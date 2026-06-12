@@ -5,7 +5,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Options } from '../types';
 import type {
   DealBadge,
   Listing,
@@ -29,25 +28,25 @@ import {
 
 const DEAL_THRESHOLD = 10;
 
-function blankForm(options: Options, email: string): SellFormValues {
-  const first = (xs: string[]) => xs[0] ?? '';
+// A brand-new listing starts blank — a pre-filled spec sheet reads as if the
+// answers are already chosen (confusing, and it's how listings got published
+// with the wrong specs). Only the contact email is seeded, from the signed-in
+// account, since that's the seller's own detail rather than a spec answer.
+function blankForm(email: string): SellFormValues {
   return {
-    manufacturer: first(options.manufacturers),
+    manufacturer: '',
     model: '',
-    year: String(options.year_range?.[1] ?? 2020),
-    odometer: '40000',
-    cylinders:
-      options.cylinders[0] != null
-        ? String(Math.trunc(Number(options.cylinders[0])))
-        : '',
-    condition: first(options.conditions),
-    fuel: first(options.fuels),
-    titleStatus: first(options.title_statuses),
-    transmission: first(options.transmissions),
-    drive: first(options.drives),
-    type: first(options.types),
-    paintColor: first(options.paint_colors),
-    state: first(options.states),
+    year: '',
+    odometer: '',
+    cylinders: '',
+    condition: '',
+    fuel: '',
+    titleStatus: '',
+    transmission: '',
+    drive: '',
+    type: '',
+    paintColor: '',
+    state: '',
     askingPrice: '',
     description: '',
     contactEmail: email,
@@ -71,20 +70,12 @@ type Valuation = {
 
 let tempSeq = 0;
 
-export function MyListingsProvider({
-  options,
-  children,
-}: {
-  options: Options;
-  children: ReactNode;
-}) {
+export function MyListingsProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, accessToken, user } = useAuth();
   const email = user?.email ?? '';
 
   const [myListings, setMyListings] = useState<Listing[]>([]);
-  const [form, setForm] = useState<SellFormValues>(() =>
-    blankForm(options, email),
-  );
+  const [form, setForm] = useState<SellFormValues>(() => blankForm(email));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [valuation, setValuation] = useState<Valuation>(null);
 
@@ -107,10 +98,10 @@ export function MyListingsProvider({
   }, []);
 
   const startNew = useCallback(() => {
-    setForm(blankForm(options, email));
+    setForm(blankForm(email));
     setEditingId(null);
     setValuation(null);
-  }, [options, email]);
+  }, [email]);
 
   const startFromGarage = useCallback(
     (car: GarageBridge) => {

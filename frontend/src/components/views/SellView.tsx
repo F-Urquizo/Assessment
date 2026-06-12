@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useGarage } from '../../context/GarageContext';
 import { useMyListings } from '../../context/MyListingsContext';
+import { useToast } from '../../context/ToastContext';
+import type { GarageCard as GarageCardData } from '../../types';
 import type { Listing, ListingStatus } from '../../lib/marketplace-types';
-import { DEAL_BADGE_META } from '../../lib/marketplace-types';
+import { DEAL_BADGE_META, STATUS_COLOR } from '../../lib/marketplace-types';
 import { fmt } from '../../lib/format';
 import SellForm from './SellForm';
 
@@ -14,8 +18,43 @@ function SellHead() {
       <div className="view-kicker">Workspace · 07</div>
       <div className="view-title">Sell a car</div>
       <div className="view-sub">
-        List a car for sale and manage your listings. Tip: from the Garage, press
-        “List this car →” on any saved car to prefill this form.
+        List a car for sale and manage your listings. Saved an appraisal? Start
+        from your garage below to prefill the spec sheet in one click.
+      </div>
+    </div>
+  );
+}
+
+/** Pick a saved appraisal to prefill the sell form — the same bridge as the
+ *  Garage's "List this car →", surfaced right where you list. */
+function GaragePicker({
+  cards,
+  onPick,
+}: {
+  cards: GarageCardData[];
+  onPick: (card: GarageCardData) => void;
+}) {
+  return (
+    <div className="sell-garage">
+      <div className="form-title">Start from your garage</div>
+      <div className="form-note">
+        Pick a saved appraisal to prefill the form below — then set a price and
+        publish.
+      </div>
+      <div className="sell-garage-row">
+        {cards.map((card) => (
+          <button
+            key={card.id}
+            type="button"
+            className="sell-garage-card"
+            onClick={() => onPick(card)}
+          >
+            <span className="sgc-veh">{card.label}</span>
+            <span className="sgc-meta">{card.meta}</span>
+            <span className="sgc-est">{fmt(card.estimate)}</span>
+            <span className="sgc-cta">Use this car →</span>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -23,7 +62,18 @@ function SellHead() {
 
 export default function SellView() {
   const { isAuthenticated, loading } = useAuth();
-  const { myListings, startEdit, remove, setStatus } = useMyListings();
+  const { cards } = useGarage();
+  const { myListings, startEdit, remove, setStatus, startFromGarage } =
+    useMyListings();
+  const { toast } = useToast();
+
+  const pickGarageCar = (card: GarageCardData) => {
+    startFromGarage(card);
+    toast('Loaded from garage — set a price and publish');
+    document
+      .getElementById('sell-manufacturer')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   // Silent refresh still in flight — render nothing rather than flashing the
   // logged-out prompt at a user whose session is about to be restored.
@@ -52,6 +102,8 @@ export default function SellView() {
   return (
     <>
       <SellHead />
+
+      {cards.length > 0 && <GaragePicker cards={cards} onPick={pickGarageCar} />}
 
       <SellForm />
 
@@ -92,9 +144,19 @@ function MyListingCard({
   onRemove: () => void;
   onStatus: (status: ListingStatus) => void;
 }) {
+  const { toast } = useToast();
+  // Two-step delete: the first click arms an inline confirm rather than deleting
+  // immediately, so an accidental click can't wipe a listing with no undo.
+  const [confirming, setConfirming] = useState(false);
   const title =
     `${listing.year} ${listing.manufacturer} ${listing.model}`.toUpperCase();
   const badge = listing.dealBadge ? DEAL_BADGE_META[listing.dealBadge] : null;
+
+  const confirmDelete = () => {
+    onRemove();
+    setConfirming(false);
+    toast('Listing deleted');
+  };
 
   return (
     <article className="listing-card">
@@ -111,30 +173,43 @@ function MyListingCard({
       </div>
       <div className="listing-meta">{fmt(listing.askingPrice)} · asking</div>
 
-      <div className="mylisting-foot">
-        <div className="select-wrap mylisting-status">
-          <label className="sr-only" htmlFor={`status-${listing.id}`}>
-            Status
-          </label>
-          <select
-            id={`status-${listing.id}`}
-            value={listing.status}
-            onChange={(e) => onStatus(e.target.value as ListingStatus)}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+      {confirming ? (
+        <div className="mylisting-foot mylisting-confirm" role="alertdialog" aria-label="Confirm delete">
+          <span className="mylisting-confirm-q">Delete this listing?</span>
+          <button className="linkbtn mylisting-del" onClick={confirmDelete}>
+            yes, delete
+          </button>
+          <button className="linkbtn" onClick={() => setConfirming(false)} autoFocus>
+            cancel
+          </button>
         </div>
-        <button className="linkbtn" onClick={onEdit}>
-          edit
-        </button>
-        <button className="linkbtn mylisting-del" onClick={onRemove}>
-          delete
-        </button>
-      </div>
+      ) : (
+        <div className="mylisting-foot">
+          <div className="select-wrap mylisting-status">
+            <label className="sr-only" htmlFor={`status-${listing.id}`}>
+              Status
+            </label>
+            <select
+              id={`status-${listing.id}`}
+              value={listing.status}
+              style={{ color: STATUS_COLOR[listing.status], fontWeight: 700 }}
+              onChange={(e) => onStatus(e.target.value as ListingStatus)}
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="linkbtn" onClick={onEdit}>
+            edit
+          </button>
+          <button className="linkbtn mylisting-del" onClick={() => setConfirming(true)}>
+            delete
+          </button>
+        </div>
+      )}
     </article>
   );
 }
