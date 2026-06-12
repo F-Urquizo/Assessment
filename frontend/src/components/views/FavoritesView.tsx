@@ -1,15 +1,13 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useFavorites } from '../../context/FavoritesContext';
 import ListingCard from './ListingCard';
-import ListingDetail from './ListingDetail';
 
 export default function FavoritesView() {
   const { favorites } = useFavorites();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  if (selectedId) {
-    return <ListingDetail id={selectedId} onBack={() => setSelectedId(null)} />;
-  }
+  const navigate = useNavigate();
+  // Route to the shared listing page so a favourite opens a shareable,
+  // Back-correct URL — same as the marketplace.
+  const openListing = (id: string) => navigate(`/listings/${id}`);
 
   return (
     <>
@@ -26,7 +24,7 @@ export default function FavoritesView() {
       {favorites.length ? (
         <div className="listing-grid">
           {favorites.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} onOpen={setSelectedId} />
+            <ListingCard key={listing.id} listing={listing} onOpen={openListing} />
           ))}
         </div>
       ) : (
