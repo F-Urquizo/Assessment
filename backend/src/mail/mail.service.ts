@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { buildVerificationEmail } from './verification-email.template';
 
 @Injectable()
 export class MailService {
@@ -25,12 +26,13 @@ export class MailService {
       },
     });
 
+    const { subject, text, html } = buildVerificationEmail(link);
     await transporter.sendMail({
       from: this.config.get<string>('SMTP_FROM'),
       to,
-      subject: 'Verify your email',
-      text: `Verify your email address by visiting: ${link}`,
-      html: `<p>Click <a href="${link}">here</a> to verify your email address.</p><p>This link expires in 24 hours.</p>`,
+      subject,
+      text,
+      html,
     });
   }
 }
