@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AuthApiError, verifyEmail } from '../lib/api';
+import { AuthApiError, resendVerification, verifyEmail } from '../lib/api';
+import { EMAIL_REGEX } from '../lib/auth-types';
 
 type Status = 'verifying' | 'success' | 'invalid' | 'expired';
 
@@ -61,9 +62,8 @@ export default function VerifyEmailPage() {
             <p className="auth-error" role="alert">
               This link has expired or has already been used.
             </p>
+            <ResendForm />
             <p className="auth-alt">
-              If your account is not yet verified, sign up again or
-              contact the administrator to receive a new link.{' '}
               <Link to="/login">Back to login</Link>
             </p>
           </>
@@ -74,13 +74,75 @@ export default function VerifyEmailPage() {
             <p className="auth-error" role="alert">
               The verification link is not valid.
             </p>
+            <p className="auth-note">
+              Make sure you copied the full URL from the email, or request a fresh
+              link below.
+            </p>
+            <ResendForm />
             <p className="auth-alt">
-              Make sure you copied the full URL from the email.{' '}
               <Link to="/login">Back to login</Link>
             </p>
           </>
         )}
       </section>
     </main>
+  );
+}
+
+/** Lets a user with a dead/expired link request a new verification email. The
+ *  endpoint never reveals whether the account exists, so the confirmation is
+ *  deliberately non-committal. */
+function ResendForm() {
+  const [email, setEmail] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'invalid'>('idle');
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!EMAIL_REGEX.test(email)) {
+      setState('invalid');
+      return;
+    }
+    setState('sending');
+    try {
+      await resendVerification(email);
+    } finally {
+      setState('sent');
+    }
+  }
+
+  if (state === 'sent') {
+    return (
+      <p className="auth-success" role="status">
+        If that account needs verifying, a new link is on its way — check your inbox.
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} noValidate style={{ marginTop: 18 }}>
+      <div className="field">
+        <label htmlFor="resend-email">
+          <span className="num">↺</span> Email address
+        </label>
+        <input
+          id="resend-email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-describedby={state === 'invalid' ? 'resend-error' : undefined}
+        />
+      </div>
+      {state === 'invalid' && (
+        <p id="resend-error" className="auth-error" role="alert">
+          Enter a valid email address.
+        </p>
+      )}
+      <div className="actions">
+        <button type="submit" className="appraise" disabled={state === 'sending'}>
+          {state === 'sending' ? 'Sending…' : 'Send a new link'}
+        </button>
+      </div>
+    </form>
   );
 }

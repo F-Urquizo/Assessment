@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { AuthApiError } from '../lib/api';
+import { AuthApiError, resendVerification } from '../lib/api';
 import { EMAIL_REGEX, PASSWORD_MIN_LENGTH } from '../lib/auth-types';
 
 export default function LoginPage() {
@@ -15,6 +15,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // When login fails with 403 the account exists but isn't verified — offer to
+  // re-send the link rather than leaving the user stuck.
+  const [unverified, setUnverified] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
   const errorRef = useRef<HTMLParagraphElement>(null);
 
   // Already logged in (e.g. silent refresh finished) → no reason to be here.
@@ -25,6 +29,8 @@ export default function LoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setUnverified(false);
+    setResendState('idle');
 
     // Mirror backend validation to save a round-trip on obvious errors.
     if (!EMAIL_REGEX.test(email)) {
@@ -45,11 +51,22 @@ export default function LoginPage() {
         setError('Incorrect email or password.');
       } else if (err instanceof AuthApiError && err.statusCode === 403) {
         setError('Your email is not verified. Check your inbox.');
+        setUnverified(true);
       } else {
         setError(err instanceof Error ? err.message : 'Unexpected error.');
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleResend() {
+    setResendState('sending');
+    try {
+      await resendVerification(email);
+    } finally {
+      // The endpoint always 202s (no enumeration), so we always confirm.
+      setResendState('sent');
     }
   }
 
@@ -108,6 +125,25 @@ export default function LoginPage() {
               {error}
             </p>
           )}
+
+          {unverified &&
+            (resendState === 'sent' ? (
+              <p className="auth-success" role="status">
+                If that account needs verifying, a new link is on its way — check
+                your inbox.
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="linkbtn auth-resend"
+                onClick={handleResend}
+                disabled={resendState === 'sending'}
+              >
+                {resendState === 'sending'
+                  ? 'Sending…'
+                  : 'Resend verification email'}
+              </button>
+            ))}
 
           <div className="actions">
             <button type="submit" className="appraise" disabled={submitting}>

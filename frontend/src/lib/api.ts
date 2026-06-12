@@ -219,3 +219,9 @@ export function verifyEmail(token: string): Promise<VerifyEmailResponse> {
     `/auth/verify-email?token=${encodeURIComponent(token)}`,
   );
 }
+
+/** POST /auth/resend-verification → 202 always (never reveals whether the
+ *  account exists). Re-sends the verification link for an unverified account. */
+export function resendVerification(email: string): Promise<{ ok: true }> {
+  return authPost<{ ok: true }>('/auth/resend-verification', { email });
+}

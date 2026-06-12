@@ -18,6 +18,7 @@ import { Public } from './guards';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 
 // All /auth/* routes are public — they authenticate by credentials/cookie,
 // not by Bearer token. This covers current routes and future ones (refresh,
@@ -59,6 +60,16 @@ export class AuthController {
   async verifyEmail(@Query('token') token: string) {
     await this.auth.verifyEmail(token);
     return { verified: true };
+  }
+
+  // POST /auth/resend-verification → 202 (accepted, always — never reveals
+  // whether the account exists). Throttled to resist abuse / mail flooding.
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  async resendVerification(@Body() dto: ResendVerificationDto) {
+    await this.auth.resendVerification(dto.email);
+    return { ok: true };
   }
 
   @Post('refresh')
