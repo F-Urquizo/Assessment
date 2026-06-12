@@ -18,7 +18,7 @@ export default function Marketplace({ options }: { options: Options }) {
               BLUEBOOK <em>Market</em>
             </h1>
             <div className="masthead-right">
-              Every car valued by the <strong>model</strong>
+              Every car valued by <strong>Bluebook</strong>
             </div>
           </div>
         </header>

@@ -6,11 +6,11 @@ export default function Header() {
   return (
     <header>
       <div className="masthead-kicker">
-        Random-Forest Vehicle Intelligence · 426,880 Listings Indexed
+        Used-Car Price Estimates · 426,880 Listings Analyzed
       </div>
       <div className="masthead-row">
         <h1>
-          BLUEBOOK <em>'21</em>
+          BLUEBOOK <em>Studio</em>
         </h1>
         <div className="masthead-right">
           Estimates within <strong>~$3,257</strong> on average

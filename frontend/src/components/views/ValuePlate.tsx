@@ -13,9 +13,11 @@ export default function ValuePlate() {
   const appraisal = analysis?.appraisal ?? null;
 
   let status = 'awaiting specs';
-  if (appraising) status = 'trees voting…';
+  if (appraising) status = 'estimating…';
   else if (showResult && appraisal)
-    status = appraisal.known_model ? 'estimate ready' : 'ready · model unseen, generic group';
+    status = appraisal.known_model
+      ? 'estimate ready'
+      : 'estimate ready · based on similar cars';
 
   const save = () => {
     if (!analysis || !payload) {
@@ -30,7 +32,7 @@ export default function ValuePlate() {
     <aside className="plate-wrap">
       <div className="plate">
         <div className={'stamp' + (showResult ? ' show' : '')}>
-          forest
+          Bluebook
           <br />
           certified
         </div>
@@ -42,11 +44,25 @@ export default function ValuePlate() {
         <Odometer value={showResult && appraisal ? appraisal.estimate : null} />
         <div className="plate-caption">United States Dollars</div>
 
+        {!showResult && !appraising && (
+          <div className="plate-empty">
+            <p className="plate-empty-lead">
+              Fill in the spec sheet to get an instant estimate.
+            </p>
+            <ul className="plate-empty-list">
+              <li>Estimated value &amp; likely range</li>
+              <li>Depreciation &amp; resale timing</li>
+              <li>What moves the price most</li>
+              <li>How it compares on the market</li>
+            </ul>
+          </div>
+        )}
+
         <div className={'range' + (showResult ? ' show' : '')}>
           <div className="range-label">
-            <span>Pessimistic</span>
-            <span>tree consensus · 10–90 pct</span>
-            <span>Optimistic</span>
+            <span>Low estimate</span>
+            <span>likely range</span>
+            <span>High estimate</span>
           </div>
           <div className="range-bar">
             <div className="range-fill"></div>
@@ -67,8 +83,8 @@ export default function ValuePlate() {
         </div>
 
         <div className="plate-foot">
-          Estimate by a 400-tree random forest trained on 20,000 cleaned Craigslist
-          listings (April 2021). Asking prices, not sale prices.
+          Estimate based on 20,000 real used-car listings. These are asking
+          prices, not final sale prices.
         </div>
       </div>
     </aside>

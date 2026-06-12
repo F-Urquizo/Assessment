@@ -8,7 +8,7 @@ export default function RecsList({ recs }: { recs: Recommendation[] }) {
     return (
       <div className="rec-empty">
         This car is already configured at the top of its value range — no high-ROI
-        improvements found by the model.
+        improvements found.
       </div>
     );
   }

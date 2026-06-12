@@ -44,7 +44,7 @@ export default function ForecastView() {
         <div className="view-title">Depreciation &amp; timing</div>
         <div className="view-sub">
           Projecting this vehicle forward — each year it ages and accrues your expected
-          mileage, re-valued by the model. Use it to decide whether to sell now or hold.
+          mileage, re-valued at each step. Use it to decide whether to sell now or hold.
         </div>
         <SubjectStrip payload={payload} appraisal={analysis.appraisal} />
       </div>
@@ -96,7 +96,7 @@ export default function ForecastView() {
       <div className="card" style={{ marginTop: 26 }}>
         <div className="card-title">Value vs odometer — this exact car</div>
         <div className="card-note">
-          How the model prices this vehicle across a sweep of mileages. The amber dot is
+          How Bluebook prices this vehicle across a range of mileages. The amber dot is
           where it sits today.
         </div>
         <LineChart points={mileagePoints} nowIndex={nowIdx} valueFmt={fmtK} />
