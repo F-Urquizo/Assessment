@@ -81,9 +81,9 @@ export class AuthController {
     const raw = req.cookies?.['refresh'] as string | undefined;
     if (!raw) throw new UnauthorizedException();
     const ctx = { ip: (req as any).ip, userAgent: req.headers['user-agent'] as string | undefined };
-    const { accessToken, rawRefresh } = await this.auth.refresh(raw, ctx);
+    const { accessToken, rawRefresh, user } = await this.auth.refresh(raw, ctx);
     res.cookie('refresh', rawRefresh, this.cookieOptions());
-    return { accessToken };
+    return { accessToken, user };
   }
 
   @Post('logout')

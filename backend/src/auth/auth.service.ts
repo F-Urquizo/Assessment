@@ -31,6 +31,7 @@ export interface LoginResult {
 export interface RefreshResult {
   accessToken: string;
   rawRefresh: string;
+  user: UserPublic;
 }
 
 @Injectable()
@@ -213,7 +214,7 @@ export class AuthService {
       ...ctx,
     });
 
-    return { accessToken, rawRefresh: newRaw };
+    return { accessToken, rawRefresh: newRaw, user: this.users.toPublic(user) };
   }
 
   async logout(rawToken: string | undefined, ctx: AuditCtx = {}): Promise<void> {
