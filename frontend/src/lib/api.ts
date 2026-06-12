@@ -86,15 +86,13 @@ export function fetchFavorites(token: string | null): Promise<Listing[]> {
   return authRequest<Listing[]>('/favorites', token);
 }
 
-/** POST /favorites — favourite a listing. */
+/** POST /favorites/:listingId — favourite a listing. */
 export function addFavorite(
   listingId: string,
   token: string | null,
-): Promise<{ favorited: true }> {
-  return authRequest('/favorites', token, {
+): Promise<void> {
+  return authRequest<void>(`/favorites/${encodeURIComponent(listingId)}`, token, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ listingId }),
   });
 }
 
