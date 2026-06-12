@@ -258,6 +258,6 @@ frontend runs via Vite (`npm run dev`, port 5173) and proxies to the backend
 migrate + seed → backend + model-service → frontend**. Full setup, env vars and
 troubleshooting are in the root [`README.md`](../README.md).
 
-**Quality gates:** Jest (backend, ~180 tests), Vitest + Testing Library
+**Quality gates:** Jest (backend, ~196 tests), Vitest + Testing Library
 (frontend components and lib logic), TypeScript type-check and ESLint. The team
 works on feature branches with pull-request review; Docker gives dev/prod parity.

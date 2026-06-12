@@ -108,10 +108,10 @@ response body and a long-lived refresh token in an httpOnly cookie.
 
 **Set-Cookie header** (see § Cookie attributes for SameSite details)
 ```
-Set-Cookie: refresh=<token>; HttpOnly; Path=/auth/refresh; Max-Age=604800
+Set-Cookie: refresh=<token>; HttpOnly; Path=/auth; Max-Age=604800
 ```
-`Path=/auth/refresh` scopes the cookie so it is only sent by the browser on
-refresh calls, not on every request.
+`Path=/auth` scopes the cookie to all `/auth/*` routes (refresh and logout both
+need it); the browser won't send it on non-auth requests.
 
 **Token lifetimes**
 
@@ -169,7 +169,7 @@ Revokes the current refresh token and clears the cookie. Idempotent — returns
 
 **Set-Cookie header** (cookie deletion)
 ```
-Set-Cookie: refresh=; HttpOnly; Path=/auth/refresh; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT
+Set-Cookie: refresh=; HttpOnly; Path=/auth; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT
 ```
 
 **Errors** — none beyond `5xx`. A missing or invalid cookie is silently ignored.
@@ -247,7 +247,7 @@ Set-Cookie: refresh=<token>;
   HttpOnly;
   Secure;
   SameSite=Lax;
-  Path=/auth/refresh;
+  Path=/auth;
   Domain=.example.com;
   Max-Age=604800
 ```
@@ -263,7 +263,7 @@ Set-Cookie: refresh=<token>;
   HttpOnly;
   Secure;
   SameSite=None;
-  Path=/auth/refresh;
+  Path=/auth;
   Max-Age=604800
 ```
 

@@ -1,6 +1,6 @@
 # Database Design
 
-> Migrations: `20260609181917_auth_init` · `20260610033940_listings_init` · `20260610171233_listing_price_history` · `20260610200000_add_favorites_search_history`
+> Migrations: `20260609181917_auth_init` · `20260610033940_listings_init` · `20260610065019_audit_log` · `20260610171233_listing_price_history` · `20260610200000_add_favorites_search_history` · `20260611025500_add_listing_price_history_ranges` · `20260612120000_favorites`
 > ORM: Prisma 6 · Provider: PostgreSQL 16
 
 ---
@@ -15,7 +15,7 @@ Stores the canonical identity record for every account.
 |---|---|---|
 | `id` | `TEXT` (cuid) | Collision-resistant, URL-safe, no sequence lock contention |
 | `email` | `TEXT UNIQUE` | Lowercased before insert at the service layer |
-| `passwordHash` | `TEXT` | bcrypt hash; raw password never persisted |
+| `passwordHash` | `TEXT` | argon2id hash; raw password never persisted |
 | `role` | `Role` enum | `user` \| `admin`; stored as Postgres enum for constraint enforcement |
 | `emailVerified` | `BOOLEAN` | Guards access to protected routes until email is confirmed |
 | `createdAt` | `TIMESTAMP` | Immutable audit field |
